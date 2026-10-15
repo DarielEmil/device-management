@@ -3,11 +3,17 @@ node_modules/
 .npm/
 .pnpm-store/
 
-# Compilación y caché (Node.js / NestJS / TypeScript)
+# Compilación y caché (Express.js / Node.js / TypeScript)
 dist/
 build/
 .cache/
 *.tsbuildinfo
+
+# Archivos generados en ejecución por la aplicación Express
+uploads/
+sessions/
+*.pid
+*.pid.lock
 
 # Pruebas y cobertura
 coverage/
