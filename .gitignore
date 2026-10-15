@@ -51,3 +51,11 @@ Thumbs.db
 
 # Configuración local de agentes
 .agents/
+
+# Next.js y reportes de pruebas del navegador
+.next/
+out/
+playwright-report/
+test-results/
+
+next-env.d.ts
