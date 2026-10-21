@@ -1,10 +1,8 @@
 import { createApp } from "./app.js";
-import { loadEnv } from "./config/env.js";
-import { createUseCases } from "./container.js";
 
-const env = loadEnv();
-const app = createApp(createUseCases(), env.CORS_ORIGIN);
+const port = Number(process.env.PORT ?? 8080);
+const corsOrigin = process.env.CORS_ORIGIN ?? "http://127.0.0.1:3000";
 
-app.listen(env.PORT, () => {
-  console.log(`Backend escuchando en http://localhost:${env.PORT}/api`);
+createApp(corsOrigin).listen(port, () => {
+  console.log(`Backend escuchando en http://localhost:${port}/api`);
 });

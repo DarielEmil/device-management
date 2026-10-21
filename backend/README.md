@@ -24,9 +24,8 @@ src/
     entities/ rules/ use-cases/ ports/
   db/            Adaptadores que implementan los ports (repositorios)
     repositories/
-  config/        Variables de entorno validadas
-  container.ts   Composición: único lugar que conoce las tres capas
-  app.ts         Express (CORS, JSON, router, errores)
+  config/        Configuración y variables de entorno
+  app.ts         Express (CORS, JSON, router)
   server.ts      Arranque
 ```
 
@@ -34,8 +33,4 @@ ESLint (`eslint.config.mts`) hace cumplir las dependencias: negocio no importa p
 
 ## Estado
 
-Incluido: `GET /api/health`, `GET /api/equipment?status=` (CU-05), `POST /api/equipment` (CU-01), formato de error uniforme `{ error: { code, message, fields } }` y UUID v7 generado en negocio.
-
-Los repositorios son **en memoria** porque el motor de DB sigue pendiente (ver `Diagrama ER`). Al elegirlo, solo se reemplaza el adaptador en `db/` y `container.ts`; negocio no cambia.
-
-Pendiente (siguientes PRs): autenticación por sesión y RBAC (`/auth/*`), empleados (CU-02), préstamos (CU-03, CU-04, CU-06), cuentas/invitaciones y migraciones. **Hasta que exista auth, los endpoints no están protegidos.**
+Solo arranca el servidor con `GET /api/health`. Las carpetas de cada capa están vacías (`.gitkeep`) y se llenan al agregar funcionalidad: casos de uso CU-01 a CU-06, autenticación por sesión y RBAC, y el repositorio de DB cuando se elija el motor (pendiente en `Diagrama ER`).
