@@ -12,6 +12,22 @@ npm run check    # lint + typecheck + tests
 npm run build && npm start
 ```
 
+### Base de datos (MySQL 8.4.13 con Docker)
+
+`docker-compose.yml` levanta MySQL y usa el mismo `.env` que el backend. Desde `backend/`:
+
+```sh
+cp .env.example .env          # cambiar MYSQL_ROOT_PASSWORD y MYSQL_PASSWORD
+docker compose up -d          # crea el volumen, inicializa la base y arranca
+docker compose ps             # esperar a que el estado sea "healthy"
+docker compose exec mysql mysql -udevice_management -p device_management
+```
+
+- La primera vez que se crea el volumen, MySQL crea la base `MYSQL_DATABASE` y el usuario `MYSQL_USER` con acceso a ella. Además ejecuta los scripts de `database/init/`, que dan permiso al usuario para la shadow database de `prisma migrate dev`. Las tablas las crean las migraciones, no el contenedor.
+- El puerto del host es `3306` por defecto, configurable con `MYSQL_PORT`.
+- `DATABASE_URL` debe usar el mismo usuario, contraseña, puerto y base que las variables `MYSQL_*` del mismo `.env`.
+- `docker compose down` detiene el contenedor y conserva los datos. `docker compose down -v` también borra el volumen: el siguiente `up` vuelve a inicializar todo.
+
 ## Arquitectura por capas
 
 Según `Arquitectura.md`: cada capa solo conoce a la inmediata inferior y las dependencias van siempre hacia abajo.
