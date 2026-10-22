@@ -70,9 +70,10 @@ export function createAccountUseCases({ uow, clock, notifier }: UseCaseDeps) {
       return invited;
     },
 
-    // Baja lógica: la cuenta pasa a Inactivo, su empleado vinculado también
-    // queda inactivo y se cierran todas sus sesiones. No se permite si ese
-    // empleado tiene préstamos activos, ni desactivar la propia cuenta.
+        // Baja lógica: la cuenta pasa a Inactivo, su empleado vinculado también
+    // queda inactivo y se cierran todas sus sesiones. Sus préstamos activos se
+    // conservan y se devuelven después (CU-04); al quedar inactivo ya no recibe
+    // préstamos nuevos. No se puede desactivar la propia cuenta.
     async deactivateAccount(actor: Actor, userId: string): Promise<PublicUser> {
       authorize(actor, "accounts:write");
       if (userId === actor.userId)
@@ -82,20 +83,8 @@ export function createAccountUseCases({ uow, clock, notifier }: UseCaseDeps) {
         if (!user) throw new DomainError("La cuenta no existe.", "NOT_FOUND");
         if (user.status === "Inactivo")
           throw new DomainError("La cuenta ya está inactiva.", "CONFLICT");
-        if (user.employeeId) {
-          // Bloquea al empleado antes de contar: un préstamo simultáneo para él
-          // espera a que termine la baja y entonces lo ve inactivo.
-          await repositories.employees.findByIdForUpdate(user.employeeId);
-          const activeLoans = await repositories.loans.countActiveByEmployee(
-            user.employeeId,
-          );
-          if (activeLoans > 0)
-            throw new DomainError(
-              "No se puede desactivar: el empleado tiene préstamos activos. Registra la devolución primero.",
-              "CONFLICT",
-            );
+        if (user.employeeId)
           await repositories.employees.setActive(user.employeeId, false);
-        }
         await repositories.users.updateStatus(user.id, "Inactivo");
         await repositories.sessions.deleteByUserId(user.id);
         return toPublicUser({ ...user, status: "Inactivo" });
