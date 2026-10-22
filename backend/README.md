@@ -1,4 +1,4 @@
-# Device Management — Backend
+ # Device Management — Backend
 
 API REST del monolito. **Node.js 22, Express 5 y TypeScript estricto.** Convive con `../frontend` en el mismo repositorio y sirve en `http://localhost:8080/api`, la URL que el frontend espera en `NEXT_PUBLIC_API_BASE_URL`.
 
