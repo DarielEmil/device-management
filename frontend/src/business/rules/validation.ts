@@ -3,6 +3,7 @@ import {
   departments,
   DomainError,
   equipmentTypes,
+  roleSchema,
   type FieldErrors,
 } from "../entities/models";
 
@@ -51,7 +52,7 @@ export const registerInputSchema = loginInputSchema.extend({
 });
 export const inviteInputSchema = z.object({
   email,
-  role: z.enum(["Empleado", "Encargado"]),
+  role: roleSchema,
   employeeId: z.string(),
 });
 

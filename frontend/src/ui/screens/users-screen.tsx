@@ -5,8 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { Plus, UserPlus } from "lucide-react";
 import { useState } from "react";
 import {
+  AccountStatus,
   departments,
   fullName,
+  Role,
   type Account,
 } from "@/business/entities/models";
 import { selectAccounts, selectEmployees } from "@/business/rules/selectors";
@@ -18,6 +20,7 @@ import {
   PageHeader,
   Pagination,
   SearchInput,
+  StatusBadge,
 } from "../components/primitives";
 import {
   DeactivateModal,
@@ -25,7 +28,7 @@ import {
   InviteModal,
 } from "../components/management-modals";
 import { usePagination } from "../hooks/use-pagination";
-import { initials } from "../format";
+import { initials, roleLabels, statusLabels } from "../format";
 
 export function UsersScreen() {
   const { snapshot } = useApplication();
@@ -223,8 +226,11 @@ function AccountsTable() {
             }}
           >
             <option value="">Rol: Todos</option>
-            <option>Encargado</option>
-            <option>Empleado</option>
+            {Object.values(Role).map((value) => (
+              <option key={value} value={value}>
+                {roleLabels[value]}
+              </option>
+            ))}
           </select>
           <select
             className="toolbar-select"
@@ -236,9 +242,11 @@ function AccountsTable() {
             }}
           >
             <option value="">Estado: Todos</option>
-            <option>Activo</option>
-            <option>Inactivo</option>
-            <option>Invitado</option>
+            {Object.values(AccountStatus).map((value) => (
+              <option key={value} value={value}>
+                {statusLabels[value]}
+              </option>
+            ))}
           </select>
         </div>
         <div className="overflow-x-auto">
@@ -274,16 +282,19 @@ function AccountsTable() {
                     </div>
                   </td>
                   <td className="text-muted">{account.email}</td>
-                  <td>{account.role}</td>
+                  <td>{roleLabels[account.role]}</td>
                   <td>
-                    <Badge
-                      tone={account.status === "Activo" ? "success" : undefined}
-                    >
-                      {account.status}
-                    </Badge>
+                    <StatusBadge
+                      status={account.status}
+                      tone={
+                        account.status === AccountStatus.Active
+                          ? "success"
+                          : undefined
+                      }
+                    />
                   </td>
                   <td>
-                    {account.status !== "Inactivo" &&
+                    {account.status !== AccountStatus.Inactive &&
                     account.id !== session?.account.id ? (
                       <Button
                         variant="ghost"

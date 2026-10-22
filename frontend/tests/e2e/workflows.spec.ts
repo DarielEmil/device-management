@@ -338,14 +338,14 @@ test("captura de referencia desktop y navegación sin errores de consola", async
 test("los indicadores navegan a rutas en inglés y conservan los filtros", async ({ page }) => {
   await login(page);
   await page.getByRole("link", { name: /Disponibles/ }).click();
-  await expect(page).toHaveURL(/\/inventory\?status=Disponible$/);
-  await expect(page.getByRole("combobox", { name: "Filtrar por estado", exact: true })).toHaveValue("Disponible");
+  await expect(page).toHaveURL(/\/inventory\?status=available$/);
+  await expect(page.getByRole("combobox", { name: "Filtrar por estado", exact: true })).toHaveValue("available");
   await expect(page.getByRole("row").filter({ hasText: "EQ-006" })).toBeVisible();
   await expect(page.getByRole("row").filter({ hasText: "EQ-001" })).toHaveCount(0);
   await navigate(page, "Dashboard");
   await page.getByRole("link", { name: /Devoluciones atrasadas/ }).click();
-  await expect(page).toHaveURL(/\/loans\?status=Atrasado$/);
-  await expect(page.getByRole("combobox", { name: "Filtrar por estado del préstamo" })).toHaveValue("Atrasado");
+  await expect(page).toHaveURL(/\/loans\?status=overdue$/);
+  await expect(page.getByRole("combobox", { name: "Filtrar por estado del préstamo" })).toHaveValue("overdue");
   await expect(page.getByRole("row").filter({ hasText: "EQ-003" })).toHaveCount(0);
 });
 

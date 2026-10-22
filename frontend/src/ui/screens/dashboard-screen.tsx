@@ -10,6 +10,11 @@ import {
   Plus,
 } from "lucide-react";
 import { useState } from "react";
+import {
+  EquipmentStatus,
+  LoanStatus,
+  Role,
+} from "@/business/entities/models";
 import { dashboardSummary } from "@/business/rules/selectors";
 import { useApplication } from "../context/application-context";
 import {
@@ -17,6 +22,7 @@ import {
   Button,
   EmptyState,
   PageHeader,
+  StatusBadge,
 } from "../components/primitives";
 import { LoanModal } from "../components/management-modals";
 import { LoanTable } from "../components/loan-table";
@@ -24,7 +30,7 @@ import { formatDate } from "../format";
 
 export function DashboardScreen() {
   const { session } = useApplication();
-  return session?.account.role === "Empleado" ? (
+  return session?.account.role === Role.Employee ? (
     <EmployeeDashboard />
   ) : (
     <ManagerDashboard />
@@ -46,19 +52,19 @@ function ManagerDashboard() {
       label: "Disponibles",
       value: summary.available,
       icon: Box,
-      href: "/inventory?status=Disponible",
+      href: `/inventory?status=${EquipmentStatus.Available}`,
     },
     {
       label: "Prestados",
       value: summary.loaned,
       icon: ArrowLeftRight,
-      href: "/inventory?status=Prestado",
+      href: `/inventory?status=${EquipmentStatus.Loaned}`,
     },
     {
       label: "Devoluciones atrasadas",
       value: summary.overdue,
       icon: CircleAlert,
-      href: "/loans?status=Atrasado",
+      href: `/loans?status=${LoanStatus.Overdue}`,
     },
   ];
   return (
@@ -265,7 +271,7 @@ function EmployeeDashboard() {
                   <td className="font-medium">{item.name}</td>
                   <td>{item.type}</td>
                   <td>
-                    <Badge>{item.status}</Badge>
+                    <StatusBadge status={item.status} />
                   </td>
                 </tr>
               ))}

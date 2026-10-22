@@ -1,7 +1,7 @@
 "use client";
-import type { Loan } from "@/business/entities/models";
+import { LoanStatus, type Loan } from "@/business/entities/models";
 import { daysUntil, loanStatus } from "@/business/rules/loans";
-import { Badge, Button } from "./primitives";
+import { Button, StatusBadge } from "./primitives";
 import { formatDate } from "../format";
 
 export function LoanTable({
@@ -69,7 +69,7 @@ export function LoanTable({
                 <td
                   className={
                     compact
-                      ? status === "Atrasado"
+                      ? status === LoanStatus.Overdue
                         ? "text-danger"
                         : "text-amber-700"
                       : "text-muted"
@@ -86,7 +86,7 @@ export function LoanTable({
                     : formatDate(loan.returnedOn)}
                 </td>
                 <td>
-                  <Badge>{status}</Badge>
+                  <StatusBadge status={status} />
                 </td>
                 {onReturn && (
                   <td className="text-right">

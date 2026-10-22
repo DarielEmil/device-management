@@ -1,5 +1,7 @@
 import {
+  EquipmentStatus,
   equipmentTypes,
+  LoanStatus,
   fullName,
   type Loan,
   type Snapshot,
@@ -74,14 +76,14 @@ export function dashboardSummary(snapshot: Snapshot, today: string) {
   const active = snapshot.loans.filter((loan) => !loan.returnedOn);
   return {
     total: snapshot.equipment.length,
-    available: snapshot.equipment.filter((item) => item.status === "Disponible")
+    available: snapshot.equipment.filter((item) => item.status === EquipmentStatus.Available)
       .length,
-    loaned: snapshot.equipment.filter((item) => item.status === "Prestado")
+    loaned: snapshot.equipment.filter((item) => item.status === EquipmentStatus.Loaned)
       .length,
-    overdue: active.filter((loan) => loanStatus(loan, today) === "Atrasado")
+    overdue: active.filter((loan) => loanStatus(loan, today) === LoanStatus.Overdue)
       .length,
     pending: active
-      .filter((loan) => loanStatus(loan, today) !== "Activo")
+      .filter((loan) => loanStatus(loan, today) !== LoanStatus.Active)
       .sort((a, b) => a.dueOn.localeCompare(b.dueOn)),
     distribution: equipmentTypes.map((type) => ({
       type,
