@@ -34,7 +34,7 @@ export interface EmployeeRepository {
   findById(id: string): Promise<Employee | null>;
   // Bloquea la fila hasta que termine la transacción (SELECT ... FOR UPDATE).
   // Lo usan las operaciones que dependen del estado del empleado (vincular una
-  // cuenta, prestarle un equipo, darlo de baja) para no cruzarse entre sí.
+  // cuenta, prestarle un equipo) para no cruzarse entre sí.
   findByIdForUpdate(id: string): Promise<Employee | null>;
   findByIdentity(identity: string): Promise<Employee | null>;
   insert(employee: Employee): Promise<void>;
@@ -51,7 +51,6 @@ export interface LoanRepository {
   // Igual que findById, pero bloquea la fila hasta el fin de la transacción.
   findByIdForUpdate(id: string): Promise<LoanDetails | null>;
   findActiveByEquipment(equipmentId: string): Promise<Loan | null>;
-  countActiveByEmployee(employeeId: string): Promise<number>;
   insert(loan: Loan): Promise<void>;
   markReturned(id: string, returnedOn: IsoDate): Promise<void>;
 }

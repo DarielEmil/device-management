@@ -70,7 +70,7 @@ export function createAccountUseCases({ uow, clock, notifier }: UseCaseDeps) {
       return invited;
     },
 
-        // Baja lógica: la cuenta pasa a Inactivo, su empleado vinculado también
+    // Baja lógica: la cuenta pasa a Inactivo, su empleado vinculado también
     // queda inactivo y se cierran todas sus sesiones. Sus préstamos activos se
     // conservan y se devuelven después (CU-04); al quedar inactivo ya no recibe
     // préstamos nuevos. No se puede desactivar la propia cuenta.

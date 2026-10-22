@@ -141,11 +141,6 @@ export function createInMemoryUnitOfWork(): InMemoryUnitOfWork {
         );
         return loan ? copy(loan) : null;
       },
-      async countActiveByEmployee(employeeId) {
-        return [...store.loans.values()].filter(
-          (row) => row.employeeId === employeeId && row.status === "Activo",
-        ).length;
-      },
       async insert(loan) {
         write("loans.insert");
         // Restricción de la DB (issue #4): un solo préstamo activo por equipo.

@@ -64,9 +64,9 @@ export function createLoanUseCases({ uow, clock }: UseCaseDeps) {
           throw new DomainError("El equipo no existe.", "NOT_FOUND", {
             equipmentId: UNAVAILABLE_EQUIPMENT,
           });
-        // Bloqueo del empleado: una baja simultánea de su cuenta no puede
-        // dejarlo inactivo con este préstamo activo. Orden de bloqueo: equipo y
-        // luego empleado; las demás operaciones solo bloquean al empleado.
+        // Bloqueo del empleado: si su cuenta se da de baja a la vez, este
+        // préstamo espera y, si la baja termina antes, se rechaza por empleado
+        // inactivo. Orden de bloqueo: equipo y luego empleado.
         const employee = await repositories.employees.findByIdForUpdate(data.employeeId);
         if (!employee)
           throw new DomainError("El empleado no existe.", "NOT_FOUND", {

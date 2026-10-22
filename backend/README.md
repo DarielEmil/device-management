@@ -64,7 +64,7 @@ Reglas principales:
   - Contraseñas con scrypt (parámetros de OWASP). Mismo error y mismo costo para correo inexistente, contraseña incorrecta o cuenta no activa.
 - **Cuentas:**
   - Invitar crea una cuenta `Invitado` sin contraseña.
-  - Desactivar es una baja lógica: la cuenta pasa a `Inactivo`, su empleado se desactiva y sus sesiones se cierran. Se rechaza si el empleado tiene préstamos activos o si es la propia cuenta.
+  - Desactivar es una baja lógica: la cuenta pasa a `Inactivo`, su empleado se desactiva y sus sesiones se cierran. Sus préstamos activos se conservan (se devuelven con CU-04) y ya no puede recibir préstamos nuevos. No se puede desactivar la propia cuenta.
 
 ### Decisiones abiertas del issue #5 y valor tomado
 

@@ -96,28 +96,22 @@ describe("cuentas", () => {
     expect(uow.store.sessions.has(hashSessionToken(token))).toBe(false);
   });
 
-  it("no desactiva si el empleado tiene préstamos activos", async () => {
+  it("desactiva aunque tenga préstamos activos: se conservan y se pueden devolver", async () => {
     const { useCases, manager, employeeUser, ana, addEquipment, addLoan, uow } = setup();
-    addLoan({ employeeId: ana.id, equipmentId: addEquipment().id });
-    await expectDomainError(useCases.accounts.deactivateAccount(manager, employeeUser.id), {
-      code: "CONFLICT",
-      message:
-        "No se puede desactivar: el empleado tiene préstamos activos. Registra la devolución primero.",
-    });
-    expect(uow.store.users.get(employeeUser.id)?.status).toBe("Activo");
-  });
-
-  it("una baja y un préstamo simultáneos no dejan un empleado inactivo con préstamo activo", async () => {
-    const { useCases, manager, employeeUser, ana, addEquipment, uow } = setup();
     const laptop = addEquipment();
-    await Promise.allSettled([
-      useCases.accounts.deactivateAccount(manager, employeeUser.id),
+    const loan = addLoan({ employeeId: ana.id, equipmentId: laptop.id });
+    await useCases.accounts.deactivateAccount(manager, employeeUser.id);
+    expect(uow.store.users.get(employeeUser.id)?.status).toBe("Inactivo");
+    expect(uow.store.employees.get(ana.id)?.active).toBe(false);
+    expect(uow.store.loans.get(loan.id)?.status).toBe("Activo");
+    expect(uow.store.equipment.get(laptop.id)?.status).toBe("Prestado");
+
+    await useCases.loans.returnLoan(manager, loan.id);
+    expect(uow.store.loans.get(loan.id)?.status).toBe("Devuelto");
+    await expectDomainError(
       useCases.loans.createLoan(manager, { employeeId: ana.id, equipmentId: laptop.id, dueOn: "2026-10-20" }),
-    ]);
-    const activeLoans = [...uow.store.loans.values()].filter(
-      (loan) => loan.employeeId === ana.id && loan.status === "Activo",
+      { code: "CONFLICT", fields: { employeeId: expect.any(String) } },
     );
-    expect(uow.store.employees.get(ana.id)?.active === false && activeLoans.length > 0).toBe(false);
   });
 
   it("no permite desactivar la propia cuenta, una inexistente o una ya inactiva", async () => {
