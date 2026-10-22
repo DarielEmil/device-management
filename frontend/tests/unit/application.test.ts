@@ -1,4 +1,10 @@
 import { describe, expect, it } from "vitest";
+import {
+  AccountStatus,
+  EquipmentStatus,
+  LoanStatus,
+  Role,
+} from "@/business/entities/models";
 import { createApplication } from "@/business/use-cases/application";
 import { createMockGateways } from "@/mocks/repositories/mock-gateways";
 import { createSeed, DEMO_PASSWORD } from "@/mocks/data/seed";
@@ -50,17 +56,17 @@ async function manager(scenario?: string) {
 
 describe("préstamos y fechas", () => {
   it.each([
-    ["2026-10-06", "Atrasado"],
-    ["2026-10-07", "Por vencer"],
-    ["2026-10-10", "Por vencer"],
-    ["2026-10-11", "Activo"],
+    ["2026-10-06", LoanStatus.Overdue],
+    ["2026-10-07", LoanStatus.DueSoon],
+    ["2026-10-10", LoanStatus.DueSoon],
+    ["2026-10-11", LoanStatus.Active],
   ])("clasifica fecha %s como %s", (dueOn, expected) => {
     const loan = createSeed().loans[0]!;
     expect(loanStatus({ ...loan, dueOn }, today)).toBe(expected);
   });
   it("una devolución tiene prioridad sobre la fecha prevista", () => {
     const loan = createSeed().loans[0]!;
-    expect(loanStatus({ ...loan, returnedOn: today }, today)).toBe("Devuelto");
+    expect(loanStatus({ ...loan, returnedOn: today }, today)).toBe(LoanStatus.Returned);
   });
   it("compara días calendario, incluso entre meses", () => {
     expect(daysUntil("2026-11-01", "2026-10-31")).toBe(1);
@@ -70,11 +76,11 @@ describe("préstamos y fechas", () => {
     const loan = await app.createLoan(newLoan);
     expect(
       (await app.load()).equipment.find((item) => item.id === "eq-6")?.status,
-    ).toBe("Prestado");
+    ).toBe(EquipmentStatus.Loaned);
     await app.returnLoan(loan.id);
     const snapshot = await app.load();
     expect(snapshot.equipment.find((item) => item.id === "eq-6")?.status).toBe(
-      "Disponible",
+      EquipmentStatus.Available,
     );
     expect(snapshot.loans.find((item) => item.id === loan.id)?.returnedOn).toBe(
       today,
@@ -137,7 +143,7 @@ describe("inventario y empleados", () => {
     const app = await manager();
     expect(
       await app.registerEquipment({ ...newEquipment, code: " eq-011 " }),
-    ).toMatchObject({ code: "EQ-011", status: "Disponible" });
+    ).toMatchObject({ code: "EQ-011", status: EquipmentStatus.Available });
   });
   it("rechaza códigos duplicados sin distinguir mayúsculas", async () => {
     const app = await manager();
@@ -183,7 +189,7 @@ describe("inventario y empleados", () => {
       selectEquipment(createSeed(), {
         query: "logitech",
         type: "Periférico",
-        status: "Disponible",
+        status: EquipmentStatus.Available,
       }).map((item) => item.code),
     ).toEqual(["EQ-008"]);
   });
@@ -217,7 +223,7 @@ describe("autenticación y acceso por rol (simulación)", () => {
         ...managerCredentials,
         email: " LAURA.MENDEZ@EMPRESA.COM ",
       }),
-    ).resolves.toMatchObject({ account: { role: "Encargado" } });
+    ).resolves.toMatchObject({ account: { role: Role.Manager } });
   });
   it("el empleado solo recibe su historial y equipos disponibles", async () => {
     const app = setup();
@@ -227,7 +233,7 @@ describe("autenticación y acceso por rol (simulación)", () => {
     expect(data.loans.every((loan) => loan.employeeId === "emp-ana")).toBe(
       true,
     );
-    expect(data.equipment.every((item) => item.status === "Disponible")).toBe(
+    expect(data.equipment.every((item) => item.status === EquipmentStatus.Available)).toBe(
       true,
     );
     expect(data.accounts).toEqual([]);
@@ -252,12 +258,12 @@ describe("autenticación y acceso por rol (simulación)", () => {
       name: "Pedro Ramírez",
       email: "pedro.ramirez@empresa.com",
       password: DEMO_PASSWORD,
-      role: "Encargado",
+      role: Role.Manager,
       employeeId: "emp-ana",
     };
     const session = await app.register(input);
     expect(session.account).toMatchObject({
-      role: "Empleado",
+      role: Role.Employee,
       employeeId: null,
     });
   });
@@ -285,25 +291,25 @@ describe("autenticación y acceso por rol (simulación)", () => {
     await expect(
       app.inviteUser({
         email: "pedro.ramirez@empresa.com",
-        role: "Empleado",
+        role: Role.Employee,
         employeeId: employee.id,
       }),
-    ).resolves.toMatchObject({ status: "Invitado", employeeId: employee.id });
+    ).resolves.toMatchObject({ status: AccountStatus.Invited, employeeId: employee.id });
   });
   it("no permite vincular dos cuentas al mismo empleado", async () => {
     const app = await manager();
     await expect(
       app.inviteUser({
         email: "otra@empresa.com",
-        role: "Empleado",
+        role: Role.Employee,
         employeeId: "emp-ana",
       }),
     ).rejects.toMatchObject({ fields: { employeeId: expect.any(String) } });
   });
   it("las rutas administrativas no están disponibles al empleado", () => {
-    expect(canAccess("Empleado", "/users")).toBe(false);
-    expect(canAccess("Empleado", "/inventory")).toBe(false);
-    expect(canAccess("Empleado", "/my-loans")).toBe(true);
+    expect(canAccess(Role.Employee, "/users")).toBe(false);
+    expect(canAccess(Role.Employee, "/inventory")).toBe(false);
+    expect(canAccess(Role.Employee, "/my-loans")).toBe(true);
   });
   it("los mocks retornan copias y no exponen su estado mutable", async () => {
     const app = await manager();

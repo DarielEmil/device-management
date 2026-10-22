@@ -13,8 +13,21 @@ export const departments = [
   "Tecnología",
   "Recursos Humanos",
 ] as const;
-export const roleSchema = z.enum(["Encargado", "Empleado"]);
-export const accountStatusSchema = z.enum(["Activo", "Inactivo", "Invitado"]);
+export const Role = { Manager: "manager", Employee: "employee" } as const;
+export const AccountStatus = {
+  Active: "active",
+  Inactive: "inactive",
+  Invited: "invited",
+} as const;
+export const EquipmentStatus = { Available: "available", Loaned: "loaned" } as const;
+export const LoanStatus = {
+  Active: "active",
+  DueSoon: "due_soon",
+  Overdue: "overdue",
+  Returned: "returned",
+} as const;
+export const roleSchema = z.enum(Role);
+export const accountStatusSchema = z.enum(AccountStatus);
 
 export const equipmentSchema = z.object({
   id: z.string(),
@@ -23,7 +36,7 @@ export const equipmentSchema = z.object({
   type: z.enum(equipmentTypes),
   brand: z.string(),
   model: z.string(),
-  status: z.enum(["Disponible", "Prestado"]),
+  status: z.enum(EquipmentStatus),
 });
 export const employeeSchema = z.object({
   id: z.string(),
@@ -61,7 +74,9 @@ export type Account = z.infer<typeof accountSchema>;
 export type Loan = z.infer<typeof loanSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type Role = z.infer<typeof roleSchema>;
-export type LoanStatus = "Activo" | "Por vencer" | "Atrasado" | "Devuelto";
+export type AccountStatus = z.infer<typeof accountStatusSchema>;
+export type EquipmentStatus = z.infer<typeof equipmentSchema>["status"];
+export type LoanStatus = (typeof LoanStatus)[keyof typeof LoanStatus];
 export interface Snapshot {
   equipment: Equipment[];
   employees: Employee[];

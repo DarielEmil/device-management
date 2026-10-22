@@ -3,17 +3,18 @@
 import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { equipmentTypes } from "@/business/entities/models";
+import { EquipmentStatus, equipmentTypes } from "@/business/entities/models";
 import { selectEquipment } from "@/business/rules/selectors";
 import { useApplication } from "../context/application-context";
 import {
-  Badge,
   Button,
   EmptyState,
   PageHeader,
   Pagination,
   SearchInput,
+  StatusBadge,
 } from "../components/primitives";
+import { statusLabels } from "../format";
 import { EquipmentModal, LoanModal } from "../components/management-modals";
 import { usePagination } from "../hooks/use-pagination";
 
@@ -27,21 +28,21 @@ export function InventoryScreen({
   const [query, setQuery] = useState("");
   const [type, setType] = useState("");
   const [status, setStatus] = useState(
-    availableOnly ? "Disponible" : (search.get("status") ?? ""),
+    availableOnly ? EquipmentStatus.Available : (search.get("status") ?? ""),
   );
   const [modal, setModal] = useState<"equipment" | "loan" | null>(null);
   const [equipmentId, setEquipmentId] = useState("");
   const items = selectEquipment(snapshot, {
     query,
     type,
-    status: availableOnly ? "Disponible" : status,
+    status: availableOnly ? EquipmentStatus.Available : status,
   });
   const pagination = usePagination(items);
   const filtered = Boolean(query || type || (!availableOnly && status));
   function clearFilters() {
     setQuery("");
     setType("");
-    setStatus(availableOnly ? "Disponible" : "");
+    setStatus(availableOnly ? EquipmentStatus.Available : "");
     pagination.resetPage();
   }
   const emptyTitle = filtered
@@ -103,8 +104,11 @@ export function InventoryScreen({
               }}
             >
               <option value="">Estado: Todos</option>
-              <option>Disponible</option>
-              <option>Prestado</option>
+              {Object.values(EquipmentStatus).map((value) => (
+                <option key={value} value={value}>
+                  {statusLabels[value]}
+                </option>
+              ))}
             </select>
           )}
           <span className="ml-auto text-xs text-muted">
@@ -142,11 +146,11 @@ export function InventoryScreen({
                   <td className="text-muted">{equipment.brand || "—"}</td>
                   <td className="text-muted">{equipment.model || "—"}</td>
                   <td>
-                    <Badge>{equipment.status}</Badge>
+                    <StatusBadge status={equipment.status} />
                   </td>
                   {!availableOnly && (
                     <td>
-                      {equipment.status === "Disponible" ? (
+                      {equipment.status === EquipmentStatus.Available ? (
                         <Button
                           variant="secondary"
                           aria-label={`Prestar ${equipment.code}`}

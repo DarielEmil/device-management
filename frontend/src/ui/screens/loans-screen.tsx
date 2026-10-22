@@ -3,7 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import type { Loan } from "@/business/entities/models";
+import { LoanStatus, type Loan } from "@/business/entities/models";
 import { selectLoans, type LoanTab } from "@/business/rules/selectors";
 import { useApplication } from "../context/application-context";
 import {
@@ -16,6 +16,7 @@ import {
 import { LoanTable } from "../components/loan-table";
 import { LoanModal, ReturnModal } from "../components/management-modals";
 import { usePagination } from "../hooks/use-pagination";
+import { statusLabels } from "../format";
 
 export function LoansScreen({ personal = false }: { personal?: boolean }) {
   const { snapshot, application } = useApplication();
@@ -110,10 +111,13 @@ export function LoansScreen({ personal = false }: { personal?: boolean }) {
               }}
             >
               <option value="">Estado: Todos</option>
-              <option>Activo</option>
-              <option>Por vencer</option>
-              <option>Atrasado</option>
-              {tab === "all" && <option>Devuelto</option>}
+              {Object.values(LoanStatus)
+                .filter((value) => tab === "all" || value !== LoanStatus.Returned)
+                .map((value) => (
+                  <option key={value} value={value}>
+                    {statusLabels[value]}
+                  </option>
+                ))}
             </select>
           )}
         </div>

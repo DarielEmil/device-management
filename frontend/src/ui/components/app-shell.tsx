@@ -11,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { Role } from "@/business/entities/models";
 import { canAccess } from "@/business/rules/loans";
 import { useApplication } from "../context/application-context";
 import {
@@ -20,7 +21,7 @@ import {
   LoadingState,
   Notice,
 } from "./primitives";
-import { formatDate, initials } from "../format";
+import { formatDate, initials, roleLabels } from "../format";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const {
@@ -51,7 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <LoadingState />
       </main>
     );
-  const manager = session.account.role === "Encargado";
+  const manager = session.account.role === Role.Manager;
   const navigation = manager
     ? [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -122,7 +123,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <p className="truncate text-[13px] font-medium">
                   {session.account.name}
                 </p>
-                <p className="text-xs text-muted">{session.account.role}</p>
+                <p className="text-xs text-muted">{roleLabels[session.account.role]}</p>
               </div>
             </div>
             <button

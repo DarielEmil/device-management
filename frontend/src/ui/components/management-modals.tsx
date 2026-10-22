@@ -5,7 +5,9 @@ import { loanDateError } from "@/business/rules/loans";
 import {
   departments,
   equipmentTypes,
+  EquipmentStatus,
   fullName,
+  Role,
   type Account,
   type Loan,
 } from "@/business/entities/models";
@@ -30,7 +32,7 @@ import {
   Select,
 } from "./primitives";
 import { SearchableSelect } from "./searchable-select";
-import { formatDate } from "../format";
+import { formatDate, roleLabels } from "../format";
 
 export function EquipmentModal({ onClose }: { onClose(): void }) {
   const { application, refresh, notify } = useApplication();
@@ -195,7 +197,7 @@ export function LoanModal({
           value={form.values.equipmentId}
           onChange={(value) => form.set("equipmentId", value)}
           options={snapshot.equipment
-            .filter((equipment) => equipment.status === "Disponible")
+            .filter((equipment) => equipment.status === EquipmentStatus.Available)
             .map((equipment) => ({
               value: equipment.id,
               label: `${equipment.code} · ${equipment.name}`,
@@ -317,7 +319,7 @@ export function ReturnModal({
 
 export function InviteModal({ onClose }: { onClose(): void }) {
   const { application, snapshot, refresh, notify, mockMode } = useApplication();
-  const initial: InviteInput = { email: "", role: "Empleado", employeeId: "" };
+  const initial: InviteInput = { email: "", role: Role.Employee, employeeId: "" };
   const form = useFormModel(inviteInputSchema, initial, async (input) => {
     await application.inviteUser(input);
     await refresh();
@@ -355,7 +357,7 @@ export function InviteModal({ onClose }: { onClose(): void }) {
         <fieldset>
           <legend className="mb-2 text-[13px] font-medium">Rol *</legend>
           <div className="flex rounded-sm border border-border-strong p-1">
-            {(["Empleado", "Encargado"] as const).map((role) => (
+            {[Role.Employee, Role.Manager].map((role) => (
               <label
                 className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-sm px-3 py-2 ${form.values.role === role ? "bg-primary/10 text-primary" : "text-muted"}`}
                 key={role}
@@ -368,7 +370,7 @@ export function InviteModal({ onClose }: { onClose(): void }) {
                   onChange={() => form.set("role", role)}
                   className="accent-primary"
                 />
-                {role}
+                {roleLabels[role]}
               </label>
             ))}
           </div>
@@ -445,7 +447,7 @@ export function DeactivateModal({
           <p className="font-medium">{account.name}</p>
           <p className="mt-1 text-[13px] text-muted">{account.email}</p>
           <div className="mt-3">
-            <Badge tone="neutral">{account.role}</Badge>
+            <Badge tone="neutral">{roleLabels[account.role]}</Badge>
           </div>
         </div>
         <p className="my-4 text-[13px] text-muted">

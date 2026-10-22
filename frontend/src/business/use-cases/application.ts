@@ -1,6 +1,8 @@
 import {
   DomainError,
+  EquipmentStatus,
   fullName,
+  Role,
   type Session,
   type Snapshot,
 } from "../entities/models";
@@ -38,7 +40,7 @@ export function createApplication(
   };
   const requireManager = () => {
     const account = requireSession();
-    if (account.role !== "Encargado")
+    if (account.role !== Role.Manager)
       throw new DomainError(
         "No tienes permiso para realizar esta acción.",
         {},
@@ -73,13 +75,13 @@ export function createApplication(
     },
     async load(): Promise<Snapshot> {
       const actor = requireSession();
-      if (actor.role === "Empleado") {
+      if (actor.role === Role.Employee) {
         const [equipment, loans] = await Promise.all([
           gateways.equipment.list(),
           gateways.loans.list(),
         ]);
         return {
-          equipment: equipment.filter((item) => item.status === "Disponible"),
+          equipment: equipment.filter((item) => item.status === EquipmentStatus.Available),
           loans: actor.employeeId
             ? loans.filter((loan) => loan.employeeId === actor.employeeId)
             : [],
@@ -141,7 +143,8 @@ export function createApplication(
       if (
         !equipment.some(
           (item) =>
-            item.id === input.equipmentId && item.status === "Disponible",
+            item.id === input.equipmentId &&
+            item.status === EquipmentStatus.Available,
         )
       )
         throw new DomainError("Equipo no disponible.", {

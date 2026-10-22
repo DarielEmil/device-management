@@ -1,3 +1,26 @@
+import type {
+  AccountStatus,
+  EquipmentStatus,
+  LoanStatus,
+  Role,
+} from "@/business/entities/models";
+
+export type StatusValue = AccountStatus | EquipmentStatus | LoanStatus;
+export const roleLabels: Record<Role, string> = {
+  manager: "Encargado",
+  employee: "Empleado",
+};
+export const statusLabels: Record<StatusValue, string> = {
+  available: "Disponible",
+  loaned: "Prestado",
+  active: "Activo",
+  due_soon: "Por vencer",
+  overdue: "Atrasado",
+  returned: "Devuelto",
+  inactive: "Inactivo",
+  invited: "Invitado",
+};
+
 export function formatDate(value: string | null): string {
   if (!value) return "—";
   const [year, month, day] = value.split("-");
