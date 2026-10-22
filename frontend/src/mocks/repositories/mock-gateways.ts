@@ -1,6 +1,9 @@
 import {
+  AccountStatus,
   DomainError,
+  EquipmentStatus,
   fullName,
+  Role,
   type Account,
   type Session,
 } from "@/business/entities/models";
@@ -37,7 +40,7 @@ export function createMockGateways(options: MockOptions = {}): Gateways {
     return session.account;
   };
   const manager = () => {
-    if (actor().role !== "Encargado")
+    if (actor().role !== Role.Manager)
       throw new DomainError(
         "No tienes permiso para realizar esta acción.",
         {},
@@ -64,7 +67,7 @@ export function createMockGateways(options: MockOptions = {}): Gateways {
       async login(input) {
         await wait();
         const account = data.accounts.find(
-          (item) => item.email === input.email && item.status === "Activo",
+          (item) => item.email === input.email && item.status === AccountStatus.Active,
         );
         if (!account || passwords.get(input.email) !== input.password)
           throw new DomainError("Correo o contraseña incorrectos.", {
@@ -84,8 +87,8 @@ export function createMockGateways(options: MockOptions = {}): Gateways {
           id: id("user"),
           name: input.name,
           email: input.email,
-          role: "Empleado",
-          status: "Activo",
+          role: Role.Employee,
+          status: AccountStatus.Active,
           employeeId: null,
         };
         data.accounts.push(account);
@@ -105,9 +108,9 @@ export function createMockGateways(options: MockOptions = {}): Gateways {
       async list() {
         await list();
         return clone(
-          actor().role === "Encargado"
+          actor().role === Role.Manager
             ? data.equipment
-            : data.equipment.filter((item) => item.status === "Disponible"),
+            : data.equipment.filter((item) => item.status === EquipmentStatus.Available),
         );
       },
       async create(input) {
@@ -121,7 +124,7 @@ export function createMockGateways(options: MockOptions = {}): Gateways {
           throw new DomainError("Código duplicado.", {
             code: "Ya existe un equipo con ese código de activo.",
           });
-        const item = { ...input, id: id("eq"), status: "Disponible" as const };
+        const item = { ...input, id: id("eq"), status: EquipmentStatus.Available };
         data.equipment.push(item);
         return clone(item);
       },
@@ -151,7 +154,7 @@ export function createMockGateways(options: MockOptions = {}): Gateways {
       async list() {
         await list();
         return clone(
-          actor().role === "Encargado"
+          actor().role === Role.Manager
             ? data.loans
             : data.loans.filter(
                 (loan) => loan.employeeId === actor().employeeId,
@@ -170,7 +173,7 @@ export function createMockGateways(options: MockOptions = {}): Gateways {
         if (
           scenario === "unavailable" ||
           !equipment ||
-          equipment.status !== "Disponible" ||
+          equipment.status !== EquipmentStatus.Available ||
           data.loans.some(
             (loan) =>
               loan.equipmentId === input.equipmentId && !loan.returnedOn,
@@ -198,7 +201,7 @@ export function createMockGateways(options: MockOptions = {}): Gateways {
           employeeName: fullName(employee),
         };
         data.loans.push(loan);
-        equipment.status = "Prestado";
+        equipment.status = EquipmentStatus.Loaned;
         return clone(loan);
       },
       async returnLoan(loanId) {
@@ -213,7 +216,7 @@ export function createMockGateways(options: MockOptions = {}): Gateways {
         const equipment = data.equipment.find(
           (item) => item.id === loan.equipmentId,
         );
-        if (equipment) equipment.status = "Disponible";
+        if (equipment) equipment.status = EquipmentStatus.Available;
         return clone(loan);
       },
     },
@@ -249,7 +252,7 @@ export function createMockGateways(options: MockOptions = {}): Gateways {
           name: employee ? fullName(employee) : input.email,
           email: input.email,
           role: input.role,
-          status: "Invitado",
+          status: AccountStatus.Invited,
           employeeId: employee?.id ?? null,
         };
         data.accounts.push(account);
@@ -261,7 +264,7 @@ export function createMockGateways(options: MockOptions = {}): Gateways {
         const account = data.accounts.find((item) => item.id === accountId);
         if (!account || account.id === actor().id)
           throw new DomainError("No puedes desactivar esta cuenta.");
-        account.status = "Inactivo";
+        account.status = AccountStatus.Inactive;
         if (account.employeeId) {
           const employee = data.employees.find(
             (item) => item.id === account.employeeId,

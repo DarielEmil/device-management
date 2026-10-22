@@ -72,7 +72,7 @@ Escenarios:
 - `error`: login funciona, pero las consultas fallan para probar carga/error/reintento.
 - `unavailable`: el selector muestra equipos disponibles y la confirmación simula un conflicto.
 
-Los mocks soportan registros, duplicados, préstamos, devolución, invitación y desactivación. No envían correos ni implementan activación de invitaciones. Las invitaciones quedan `Invitado`; recuperación muestra feedback de simulación. El registro público siempre crea una cuenta `Empleado` sin vínculo automático a otra persona. No hay edición de vínculos de cuentas existentes en este alcance.
+Los mocks soportan registros, duplicados, préstamos, devolución, invitación y desactivación. No envían correos ni implementan activación de invitaciones. Las invitaciones quedan `invited`; recuperación muestra feedback de simulación. El registro público siempre crea una cuenta `employee` sin vínculo automático a otra persona. No hay edición de vínculos de cuentas existentes en este alcance.
 
 Los indicadores se calculan con los registros existentes, no con los totales ilustrativos 128/83/45/7. Teléfono es opcional, siguiendo el caso de error detallado del plan. El diseño usa los colores exactos y tipografía de Stitch, sidebar 232 px, escritorio de referencia 1440 px y tablas con scroll en ventanas estrechas; no incluye layouts mobile.
 
@@ -84,7 +84,7 @@ Los indicadores se calculan con los registros existentes, no con los totales ilu
 - Préstamos: Activos / Devueltos / Todos, filtros, creación y devolución confirmada.
 - Empleado: solo catálogo disponible y préstamos propios.
 - Errores inline, formularios tipados, estados vacíos, skeletons, foco visible, modales con Escape y foco contenido, y selectores buscables por teclado.
-- `Por vencer` (0–3 días) y `Atrasado` se calculan, no se almacenan como estados.
+- `due_soon` (0–3 días) y `overdue` se calculan, no se almacenan como estados.
 
 **Los guards y permisos del frontend son de experiencia de usuario, no seguridad real.** El backend futuro debe autenticar, autorizar, filtrar datos por usuario, proteger CSRF/CORS y hacer atómicos los préstamos/devoluciones y las restricciones únicas. El mock también valida al confirmar para simular conflictos dentro de una pestaña, no concurrencia entre servidores/pestañas.
 
@@ -102,7 +102,7 @@ Todavía **no hay backend**. Los adaptadores HTTP son una propuesta de contrato 
 | GET / POST | `/loans`                        | `Loan[]` / `Loan`                                         |
 | POST       | `/loans/:id/return`             | `Loan`                                                    |
 | GET        | `/accounts`                     | `Account[]`                                               |
-| POST       | `/invitations`                  | `Account` con estado Invitado                             |
+| POST       | `/invitations`                  | `Account` con estado `invited`                            |
 | POST       | `/accounts/:id/deactivate`      | `Account`                                                 |
 
 Entidades y formularios: `src/business/entities/models.ts` y `src/business/rules/validation.ts`. Un préstamo incluye `equipmentCode`, `equipmentName` y `employeeName` para no requerir acceso al inventario administrativo. El backend debe devolver estas relaciones con el préstamo. Para Empleado, `GET /equipment` solo devuelve disponibles y `GET /loans` solo préstamos propios; no se consulta `/accounts` ni `/employees`.

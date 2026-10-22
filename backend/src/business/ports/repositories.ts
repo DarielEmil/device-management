@@ -1,28 +1,19 @@
-import type { Employee } from "../entities/employee.js";
-import type { Equipment, EquipmentStatus } from "../entities/equipment.js";
+import type { Employee } from "../entities/employee.entity.js";
+import type { Equipment, EquipmentStatus } from "../entities/equipment.entity.js";
 import type {
   IsoDate,
   Loan,
   LoanDetails,
   LoanStatus,
-} from "../entities/loan.js";
-import type { Session } from "../entities/session.js";
-import type { User, UserStatus } from "../entities/user.js";
+} from "../entities/loan.entity.js";
+import type { Session } from "../entities/session.entity.js";
+import type { User, UserStatus } from "../entities/user.entity.js";
 
-// Contratos que implementa la capa DB (issue #4). Negocio solo conoce estas
-// interfaces; nunca Prisma ni SQL.
-//
-// Unicidad (`code`, `identity`, `email` y el `employeeId` de la cuenta, que
-// admite varios NULL): los casos de uso la verifican antes de insertar, pero
-// dos peticiones simultáneas pueden pasar la verificación. Si la DB rechaza un
-// `insert` por unicidad, el adaptador lanza un DomainError CONFLICT con el
-// mismo campo y mensaje que usa el caso de uso.
+// Si la DB rechaza un insert por unicidad, el adaptador lanza DomainError CONFLICT con el mismo campo y mensaje.
 
 export interface EquipmentRepository {
   list(filter?: { status?: EquipmentStatus }): Promise<Equipment[]>;
   findById(id: string): Promise<Equipment | null>;
-  // Bloquea la fila hasta que termine la transacción (SELECT ... FOR UPDATE)
-  // para que dos préstamos simultáneos del mismo equipo no puedan pasar.
   findByIdForUpdate(id: string): Promise<Equipment | null>;
   findByCode(code: string): Promise<Equipment | null>;
   insert(equipment: Equipment): Promise<void>;
@@ -32,9 +23,6 @@ export interface EquipmentRepository {
 export interface EmployeeRepository {
   list(): Promise<Employee[]>;
   findById(id: string): Promise<Employee | null>;
-  // Bloquea la fila hasta que termine la transacción (SELECT ... FOR UPDATE).
-  // Lo usan las operaciones que dependen del estado del empleado (vincular una
-  // cuenta, prestarle un equipo) para no cruzarse entre sí.
   findByIdForUpdate(id: string): Promise<Employee | null>;
   findByIdentity(identity: string): Promise<Employee | null>;
   insert(employee: Employee): Promise<void>;
@@ -42,13 +30,11 @@ export interface EmployeeRepository {
 }
 
 export interface LoanRepository {
-  // Devuelve cada préstamo con código y nombre del equipo y nombre del empleado.
   list(filter?: {
     employeeId?: string;
     status?: LoanStatus;
   }): Promise<LoanDetails[]>;
   findById(id: string): Promise<LoanDetails | null>;
-  // Igual que findById, pero bloquea la fila hasta el fin de la transacción.
   findByIdForUpdate(id: string): Promise<LoanDetails | null>;
   findActiveByEquipment(equipmentId: string): Promise<Loan | null>;
   insert(loan: Loan): Promise<void>;
@@ -58,7 +44,6 @@ export interface LoanRepository {
 export interface UserRepository {
   list(): Promise<User[]>;
   findById(id: string): Promise<User | null>;
-  // `email` llega ya en minúsculas.
   findByEmail(email: string): Promise<User | null>;
   findByEmployeeId(employeeId: string): Promise<User | null>;
   insert(user: User): Promise<void>;
@@ -68,12 +53,77 @@ export interface UserRepository {
 export interface SessionRepository {
   findById(id: string): Promise<Session | null>;
   insert(session: Session): Promise<void>;
-  // Renueva la sesión solo si `lastSeenAt` es posterior al guardado, en una
-  // sola sentencia (UPDATE ... WHERE id = $1 AND last_seen_at < $2): con
-  // peticiones simultáneas, la que escribe última no puede hacerla retroceder.
-  // Si la sesión ya no existe no hace nada (no la recrea).
+  // Solo avanza si `lastSeenAt` es posterior (una sola sentencia) y no recrea una sesión borrada.
   touch(id: string, lastSeenAt: Date, expiresAt: Date): Promise<void>;
-  // Idempotente: no falla si la sesión ya no existe.
+  delete(id: string): Promise<void>;
+  deleteByUserId(userId: string): Promise<void>;
+}
+
+export interface Repositories {
+  equipment: EquipmentRepository;
+  employees: EmployeeRepository;
+  loans: LoanRepository;
+  users: UserRepository;
+  sessions: SessionRepository;
+}
+
+import type { Employee } from "../entities/employee.entity.js";
+import type { Equipment, EquipmentStatus } from "../entities/equipment.entity.js";
+import type {
+  IsoDate,
+  Loan,
+  LoanDetails,
+  LoanStatus,
+} from "../entities/loan.entity.js";
+import type { Session } from "../entities/session.entity.js";
+import type { User, UserStatus } from "../entities/user.entity.js";
+
+// Si la DB rechaza un insert por unicidad, el adaptador lanza DomainError CONFLICT con el mismo campo y mensaje.
+
+export interface EquipmentRepository {
+  list(filter?: { status?: EquipmentStatus }): Promise<Equipment[]>;
+  findById(id: string): Promise<Equipment | null>;
+  findByIdForUpdate(id: string): Promise<Equipment | null>;
+  findByCode(code: string): Promise<Equipment | null>;
+  insert(equipment: Equipment): Promise<void>;
+  updateStatus(id: string, status: EquipmentStatus): Promise<void>;
+}
+
+export interface EmployeeRepository {
+  list(): Promise<Employee[]>;
+  findById(id: string): Promise<Employee | null>;
+  findByIdForUpdate(id: string): Promise<Employee | null>;
+  findByIdentity(identity: string): Promise<Employee | null>;
+  insert(employee: Employee): Promise<void>;
+  setActive(id: string, active: boolean): Promise<void>;
+}
+
+export interface LoanRepository {
+  list(filter?: {
+    employeeId?: string;
+    status?: LoanStatus;
+  }): Promise<LoanDetails[]>;
+  findById(id: string): Promise<LoanDetails | null>;
+  findByIdForUpdate(id: string): Promise<LoanDetails | null>;
+  findActiveByEquipment(equipmentId: string): Promise<Loan | null>;
+  insert(loan: Loan): Promise<void>;
+  markReturned(id: string, returnedOn: IsoDate): Promise<void>;
+}
+
+export interface UserRepository {
+  list(): Promise<User[]>;
+  findById(id: string): Promise<User | null>;
+  findByEmail(email: string): Promise<User | null>;
+  findByEmployeeId(employeeId: string): Promise<User | null>;
+  insert(user: User): Promise<void>;
+  updateStatus(id: string, status: UserStatus): Promise<void>;
+}
+
+export interface SessionRepository {
+  findById(id: string): Promise<Session | null>;
+  insert(session: Session): Promise<void>;
+  // Solo avanza si `lastSeenAt` es posterior (una sola sentencia) y no recrea una sesión borrada.
+  touch(id: string, lastSeenAt: Date, expiresAt: Date): Promise<void>;
   delete(id: string): Promise<void>;
   deleteByUserId(userId: string): Promise<void>;
 }

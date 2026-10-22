@@ -18,6 +18,7 @@ import {
   type ReactNode,
   type SelectHTMLAttributes,
 } from "react";
+import { statusLabels, type StatusValue } from "../format";
 
 export function Button({
   variant = "primary",
@@ -136,27 +137,35 @@ export function Select({
     </div>
   );
 }
+type BadgeTone = "success" | "info" | "neutral" | "warning" | "danger";
+const statusTones: Record<StatusValue, BadgeTone> = {
+  available: "success",
+  loaned: "info",
+  active: "info",
+  returned: "neutral",
+  due_soon: "warning",
+  overdue: "danger",
+  inactive: "neutral",
+  invited: "warning",
+};
 export function Badge({
   children,
-  tone,
+  tone = "neutral",
 }: {
   children: string;
-  tone?: "success" | "neutral";
+  tone?: BadgeTone;
 }) {
-  const status: Record<string, string> = {
-    Disponible: "success",
-    Prestado: "info",
-    Activo: "info",
-    Devuelto: "neutral",
-    "Por vencer": "warning",
-    Atrasado: "danger",
-    Inactivo: "neutral",
-    Invitado: "warning",
-  };
+  return <span className={`badge badge-${tone}`}>{children}</span>;
+}
+export function StatusBadge({
+  status,
+  tone,
+}: {
+  status: StatusValue;
+  tone?: BadgeTone;
+}) {
   return (
-    <span className={`badge badge-${tone ?? status[children] ?? "neutral"}`}>
-      {children}
-    </span>
+    <Badge tone={tone ?? statusTones[status]}>{statusLabels[status]}</Badge>
   );
 }
 export function PageHeader({

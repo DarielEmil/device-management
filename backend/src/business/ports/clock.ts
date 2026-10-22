@@ -1,9 +1,13 @@
-import type { IsoDate } from "../entities/loan.js";
+import type { IsoDate } from "../entities/loan.entity.js";
 
-// Inyectado para que las reglas de fechas (vencimientos, expiración de
-// sesión) sean deterministas en los tests.
 export interface Clock {
   now(): Date;
-  // Fecha de hoy en la zona horaria de la empresa.
+  today(): IsoDate;
+}
+
+import type { IsoDate } from "../entities/loan.entity.js";
+
+export interface Clock {
+  now(): Date;
   today(): IsoDate;
 }

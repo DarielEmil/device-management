@@ -1,9 +1,12 @@
-import type {
-  Account,
-  Employee,
-  Equipment,
-  Loan,
-  Snapshot,
+import {
+  AccountStatus,
+  EquipmentStatus,
+  Role,
+  type Account,
+  type Employee,
+  type Equipment,
+  type Loan,
+  type Snapshot,
 } from "@/business/entities/models";
 
 export const DEMO_PASSWORD = "Demo2026!";
@@ -71,7 +74,7 @@ const equipment: Equipment[] = [
     type: "Laptop",
     brand: "Dell",
     model: "Latitude 5440",
-    status: "Prestado",
+    status: EquipmentStatus.Loaned,
   },
   {
     id: "eq-2",
@@ -80,7 +83,7 @@ const equipment: Equipment[] = [
     type: "Laptop",
     brand: "Apple",
     model: "MacBook Air M2",
-    status: "Prestado",
+    status: EquipmentStatus.Loaned,
   },
   {
     id: "eq-3",
@@ -89,7 +92,7 @@ const equipment: Equipment[] = [
     type: "Monitor",
     brand: "Dell",
     model: "P2422H",
-    status: "Prestado",
+    status: EquipmentStatus.Loaned,
   },
   {
     id: "eq-4",
@@ -98,7 +101,7 @@ const equipment: Equipment[] = [
     type: "Tablet",
     brand: "Samsung",
     model: "Galaxy Tab S9",
-    status: "Prestado",
+    status: EquipmentStatus.Loaned,
   },
   {
     id: "eq-5",
@@ -107,7 +110,7 @@ const equipment: Equipment[] = [
     type: "Laptop",
     brand: "Lenovo",
     model: "ThinkPad T14",
-    status: "Prestado",
+    status: EquipmentStatus.Loaned,
   },
   {
     id: "eq-6",
@@ -116,7 +119,7 @@ const equipment: Equipment[] = [
     type: "Laptop",
     brand: "Dell",
     model: "Latitude 5450",
-    status: "Disponible",
+    status: EquipmentStatus.Available,
   },
   {
     id: "eq-7",
@@ -125,7 +128,7 @@ const equipment: Equipment[] = [
     type: "Monitor",
     brand: "LG",
     model: "27UP850",
-    status: "Disponible",
+    status: EquipmentStatus.Available,
   },
   {
     id: "eq-8",
@@ -134,7 +137,7 @@ const equipment: Equipment[] = [
     type: "Periférico",
     brand: "Logitech",
     model: "MX Keys",
-    status: "Disponible",
+    status: EquipmentStatus.Available,
   },
   {
     id: "eq-9",
@@ -143,7 +146,7 @@ const equipment: Equipment[] = [
     type: "Tablet",
     brand: "Apple",
     model: "iPad Air",
-    status: "Disponible",
+    status: EquipmentStatus.Available,
   },
   {
     id: "eq-10",
@@ -152,7 +155,7 @@ const equipment: Equipment[] = [
     type: "Laptop",
     brand: "HP",
     model: "EliteBook 840",
-    status: "Disponible",
+    status: EquipmentStatus.Available,
   },
 ];
 const accounts: Account[] = [
@@ -160,8 +163,8 @@ const accounts: Account[] = [
     id: "user-laura",
     name: "Laura Méndez",
     email: "laura.mendez@empresa.com",
-    role: "Encargado",
-    status: "Activo",
+    role: Role.Manager,
+    status: AccountStatus.Active,
     employeeId: null,
   },
   ...employees.map(
@@ -169,8 +172,8 @@ const accounts: Account[] = [
       id: `user-${employee.id}`,
       name: `${employee.firstName} ${employee.lastName}`,
       email: `${({ "emp-ana": "ana.garcia", "emp-carlos": "carlos.ruiz", "emp-lucia": "lucia.perez", "emp-diego": "diego.torres", "emp-marta": "marta.lopez", "emp-sofia": "sofia.romero" } as Record<string, string>)[employee.id]}@empresa.com`,
-      role: "Empleado",
-      status: employee.active ? "Activo" : "Inactivo",
+      role: Role.Employee,
+      status: employee.active ? AccountStatus.Active : AccountStatus.Inactive,
       employeeId: employee.id,
     }),
   ),

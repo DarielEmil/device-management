@@ -1,4 +1,4 @@
-import type { Loan, LoanStatus, Role } from "../entities/models";
+import { LoanStatus, Role, type Loan } from "../entities/models";
 
 export function localToday(): string {
   const date = new Date();
@@ -13,9 +13,13 @@ export function daysUntil(dueOn: string, today: string): number {
 }
 
 export function loanStatus(loan: Loan, today: string): LoanStatus {
-  if (loan.returnedOn) return "Devuelto";
+  if (loan.returnedOn) return LoanStatus.Returned;
   const days = daysUntil(loan.dueOn, today);
-  return days < 0 ? "Atrasado" : days <= 3 ? "Por vencer" : "Activo";
+  return days < 0
+    ? LoanStatus.Overdue
+    : days <= 3
+      ? LoanStatus.DueSoon
+      : LoanStatus.Active;
 }
 
 export function loanDateError(
@@ -29,7 +33,7 @@ export function loanDateError(
 
 export function canAccess(role: Role, path: string): boolean {
   const route = path.split("?")[0];
-  return role === "Encargado"
+  return role === Role.Manager
     ? ["/dashboard", "/inventory", "/loans", "/users"].includes(route ?? "")
     : ["/dashboard", "/available-equipment", "/my-loans"].includes(route ?? "");
 }

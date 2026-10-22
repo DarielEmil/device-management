@@ -1,4 +1,4 @@
-import type { Snapshot } from "@/business/entities/models";
+import { EquipmentStatus, type Snapshot } from "@/business/entities/models";
 import { createSeed } from "../data/seed";
 
 export const scenarios = [
@@ -24,7 +24,7 @@ export function createScenario(name: string): {
   if (name === "no-active-loans") {
     data.loans = data.loans.filter((loan) => loan.returnedOn);
     data.equipment.forEach((item) => {
-      item.status = "Disponible";
+      item.status = EquipmentStatus.Available;
     });
   }
   return { data, scenario: name as MockScenario };
