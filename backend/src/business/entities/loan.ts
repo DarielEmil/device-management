@@ -3,7 +3,7 @@ export type IsoDate = string;
 
 // Estado almacenado: un préstamo pasa de Activo a Devuelto una sola vez.
 export const loanStatus = ["Active", "Returned"] as const;
-export type LoanStatus = (typeof loanStatus)[number];
+export type LoanStatus = (typeof LoanStatus)[keyof typeof LoanStatus];
 
 // Estado que ve el usuario. "Por vencer" y "Atrasado" se derivan de las
 // fechas al consultar; nunca se guardan (ver rules/loans.ts).
