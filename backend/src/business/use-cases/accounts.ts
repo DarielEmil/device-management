@@ -36,7 +36,10 @@ export function createAccountUseCases({ uow, clock, notifier }: UseCaseDeps) {
           throw new DomainError(EMAIL_TAKEN, "CONFLICT", { email: EMAIL_TAKEN });
         let name = data.email;
         if (data.employeeId) {
-          const employee = await repositories.employees.findById(data.employeeId);
+          // Con el bloqueo, una segunda invitación para el mismo empleado espera
+          // a que esta termine y ya ve su cuenta. La restricción única de
+          // `employeeId` en la DB es la garantía final.
+          const employee = await repositories.employees.findByIdForUpdate(data.employeeId);
           if (!employee)
             throw new DomainError("El empleado no existe.", "NOT_FOUND", {
               employeeId: INVALID_EMPLOYEE,
@@ -80,6 +83,9 @@ export function createAccountUseCases({ uow, clock, notifier }: UseCaseDeps) {
         if (user.status === "Inactivo")
           throw new DomainError("La cuenta ya está inactiva.", "CONFLICT");
         if (user.employeeId) {
+          // Bloquea al empleado antes de contar: un préstamo simultáneo para él
+          // espera a que termine la baja y entonces lo ve inactivo.
+          await repositories.employees.findByIdForUpdate(user.employeeId);
           const activeLoans = await repositories.loans.countActiveByEmployee(
             user.employeeId,
           );

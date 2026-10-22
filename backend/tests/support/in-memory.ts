@@ -100,6 +100,9 @@ export function createInMemoryUnitOfWork(): InMemoryUnitOfWork {
         const row = store.employees.get(id);
         return row ? copy(row) : null;
       },
+      async findByIdForUpdate(id) {
+        return repositories.employees.findById(id);
+      },
       async findByIdentity(identity) {
         return values(store.employees).find((row) => row.identity === identity) ?? null;
       },
@@ -179,6 +182,12 @@ export function createInMemoryUnitOfWork(): InMemoryUnitOfWork {
         write("users.insert");
         if (values(store.users).some((row) => row.email === user.email))
           throw conflict("email");
+        // Restricción de la DB: un empleado tiene como mucho una cuenta.
+        if (
+          user.employeeId &&
+          values(store.users).some((row) => row.employeeId === user.employeeId)
+        )
+          throw conflict("employeeId");
         store.users.set(user.id, copy(user));
       },
       async updateStatus(id, status) {

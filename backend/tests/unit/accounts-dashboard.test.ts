@@ -61,6 +61,31 @@ describe("cuentas", () => {
     );
   });
 
+  it("dos invitaciones simultáneas para el mismo empleado: solo una pasa", async () => {
+    const { useCases, manager, addEmployee, uow } = setup();
+    const marta = addEmployee({ firstName: "Marta", lastName: "López" });
+    const results = await Promise.allSettled([
+      useCases.accounts.inviteAccount(manager, { email: "m1@empresa.com", role: "Empleado", employeeId: marta.id }),
+      useCases.accounts.inviteAccount(manager, { email: "m2@empresa.com", role: "Empleado", employeeId: marta.id }),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect([...uow.store.users.values()].filter((user) => user.employeeId === marta.id)).toHaveLength(1);
+  });
+
+  it("si otra cuenta vincula al empleado justo antes del insert, responde CONFLICT", async () => {
+    const { useCases, manager, addEmployee, addUser, uow } = setup();
+    const marta = addEmployee({ firstName: "Marta", lastName: "López" });
+    // Simula otra transacción que confirma entre la verificación y el insert:
+    // la restricción única de la DB es la que detiene esta invitación.
+    uow.beforeWrite = (operation) => {
+      if (operation === "users.insert") addUser({ email: "otra@empresa.com", employeeId: marta.id });
+    };
+    await expectDomainError(
+      useCases.accounts.inviteAccount(manager, { email: "m1@empresa.com", role: "Empleado", employeeId: marta.id }),
+      { code: "CONFLICT", fields: { employeeId: expect.any(String) } },
+    );
+  });
+
   it("desactiva la cuenta, su empleado y todas sus sesiones", async () => {
     const { useCases, manager, employeeUser, ana, uow } = setup();
     const { token } = await useCases.auth.login({ email: employeeUser.email, password: DEMO_PASSWORD });
@@ -80,6 +105,19 @@ describe("cuentas", () => {
         "No se puede desactivar: el empleado tiene préstamos activos. Registra la devolución primero.",
     });
     expect(uow.store.users.get(employeeUser.id)?.status).toBe("Activo");
+  });
+
+  it("una baja y un préstamo simultáneos no dejan un empleado inactivo con préstamo activo", async () => {
+    const { useCases, manager, employeeUser, ana, addEquipment, uow } = setup();
+    const laptop = addEquipment();
+    await Promise.allSettled([
+      useCases.accounts.deactivateAccount(manager, employeeUser.id),
+      useCases.loans.createLoan(manager, { employeeId: ana.id, equipmentId: laptop.id, dueOn: "2026-10-20" }),
+    ]);
+    const activeLoans = [...uow.store.loans.values()].filter(
+      (loan) => loan.employeeId === ana.id && loan.status === "Activo",
+    );
+    expect(uow.store.employees.get(ana.id)?.active === false && activeLoans.length > 0).toBe(false);
   });
 
   it("no permite desactivar la propia cuenta, una inexistente o una ya inactiva", async () => {

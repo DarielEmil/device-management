@@ -12,10 +12,11 @@ import type { User, UserStatus } from "../entities/user.js";
 // Contratos que implementa la capa DB (issue #4). Negocio solo conoce estas
 // interfaces; nunca Prisma ni SQL.
 //
-// Unicidad (`code`, `identity`, `email`): los casos de uso la verifican antes
-// de insertar, pero dos peticiones simultáneas pueden pasar la verificación.
-// Si la DB rechaza un `insert` por unicidad, el adaptador lanza un DomainError
-// CONFLICT con el mismo campo y mensaje que usa el caso de uso.
+// Unicidad (`code`, `identity`, `email` y el `employeeId` de la cuenta, que
+// admite varios NULL): los casos de uso la verifican antes de insertar, pero
+// dos peticiones simultáneas pueden pasar la verificación. Si la DB rechaza un
+// `insert` por unicidad, el adaptador lanza un DomainError CONFLICT con el
+// mismo campo y mensaje que usa el caso de uso.
 
 export interface EquipmentRepository {
   list(filter?: { status?: EquipmentStatus }): Promise<Equipment[]>;
@@ -31,6 +32,10 @@ export interface EquipmentRepository {
 export interface EmployeeRepository {
   list(): Promise<Employee[]>;
   findById(id: string): Promise<Employee | null>;
+  // Bloquea la fila hasta que termine la transacción (SELECT ... FOR UPDATE).
+  // Lo usan las operaciones que dependen del estado del empleado (vincular una
+  // cuenta, prestarle un equipo, darlo de baja) para no cruzarse entre sí.
+  findByIdForUpdate(id: string): Promise<Employee | null>;
   findByIdentity(identity: string): Promise<Employee | null>;
   insert(employee: Employee): Promise<void>;
   setActive(id: string, active: boolean): Promise<void>;
