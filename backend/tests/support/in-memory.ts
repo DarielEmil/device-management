@@ -203,7 +203,9 @@ export function createInMemoryUnitOfWork(): InMemoryUnitOfWork {
       async touch(id, lastSeenAt, expiresAt) {
         write("sessions.touch");
         const row = store.sessions.get(id);
-        if (row) Object.assign(row, { lastSeenAt, expiresAt });
+        // Solo avanza: una renovación tardía con hora anterior no la retrocede.
+        if (row && row.lastSeenAt.getTime() < lastSeenAt.getTime())
+          Object.assign(row, { lastSeenAt, expiresAt });
       },
       async delete(id) {
         write("sessions.delete");

@@ -68,6 +68,10 @@ export interface UserRepository {
 export interface SessionRepository {
   findById(id: string): Promise<Session | null>;
   insert(session: Session): Promise<void>;
+  // Renueva la sesión solo si `lastSeenAt` es posterior al guardado, en una
+  // sola sentencia (UPDATE ... WHERE id = $1 AND last_seen_at < $2): con
+  // peticiones simultáneas, la que escribe última no puede hacerla retroceder.
+  // Si la sesión ya no existe no hace nada (no la recrea).
   touch(id: string, lastSeenAt: Date, expiresAt: Date): Promise<void>;
   // Idempotente: no falla si la sesión ya no existe.
   delete(id: string): Promise<void>;

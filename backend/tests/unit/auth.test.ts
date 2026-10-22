@@ -154,6 +154,23 @@ describe("sesión actual", () => {
     expect(writes).toEqual(["sessions.touch"]);
   });
 
+  it("una renovación con hora anterior no hace retroceder la sesión", async () => {
+    const { useCases, token, clock, uow } = await login();
+    const id = hashSessionToken(token);
+    clock.advance(5 * MINUTE);
+    const { session } = await useCases.auth.getCurrentSession(token);
+    // Una petición que empezó antes pero escribe después llega con su `now` viejo.
+    const older = (date: Date) => new Date(date.getTime() - 1_000);
+    await uow.repositories.sessions.touch(id, older(session.lastSeenAt), older(session.expiresAt));
+    expect(uow.store.sessions.get(id)?.lastSeenAt.getTime()).toBe(session.lastSeenAt.getTime());
+    expect(uow.store.sessions.get(id)?.expiresAt.getTime()).toBe(session.expiresAt.getTime());
+
+    // Una renovación que llega después del logout no recrea la sesión.
+    await useCases.auth.logout(token);
+    await uow.repositories.sessions.touch(id, clock.now(), clock.now());
+    expect(uow.store.sessions.has(id)).toBe(false);
+  });
+
   it("vence a las 12 horas aunque haya actividad continua", async () => {
     const { useCases, token, clock } = await login();
     for (let elapsed = 0; elapsed < 12 * 60; elapsed += 20) {
