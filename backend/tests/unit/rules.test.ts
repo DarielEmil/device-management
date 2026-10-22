@@ -173,6 +173,26 @@ describe("contraseñas (scrypt)", () => {
     expect(await hasher.verify("x", "scrypt$0$8$1$c2FsdA$aGFzaA")).toBe(false);
     expect(await hasher.verify("x", "scrypt$1024$8$1$c2FsdA$aGFzaA")).toBe(false);
   });
+
+  it("trata un costo que scrypt no acepta como credencial inválida", async () => {
+    // Hash real con su costo cambiado: el formato es correcto pero N, r o p no.
+    const [, , , , salt, key] = (await hasher.hash("Demo2026!")).split("$");
+    const withCost = (n: string, r: string, p: string) =>
+      ["scrypt", n, r, p, salt, key].join("$");
+
+    expect(await hasher.verify("Demo2026!", withCost("3", "8", "1"))).toBe(false); // N no es potencia de 2
+    expect(await hasher.verify("Demo2026!", withCost("1", "8", "1"))).toBe(false); // N debe ser > 1
+    expect(await hasher.verify("Demo2026!", withCost("1.5", "8", "1"))).toBe(false);
+    expect(await hasher.verify("Demo2026!", withCost(String(2 ** 40), "8", "1"))).toBe(false); // memoria excesiva
+    expect(await hasher.verify("Demo2026!", withCost("1024", "1000000", "1"))).toBe(false);
+    expect(await hasher.verify("Demo2026!", withCost("1024", "8", "1000"))).toBe(false);
+  });
+
+  it("no acepta configurarse con un costo no soportado", () => {
+    expect(() => createScryptPasswordHasher({ N: 3, r: 8, p: 1 })).toThrow();
+    expect(() => createScryptPasswordHasher({ N: 2 ** 22, r: 8, p: 1 })).toThrow();
+    expect(() => createScryptPasswordHasher()).not.toThrow();
+  });
 });
 
 describe("validación con los mensajes del frontend", () => {
