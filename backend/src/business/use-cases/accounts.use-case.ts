@@ -6,11 +6,10 @@ import {
   type Actor,
   type InvitationInput,
   type PublicUser,
-  type User,
 } from "../entities/user.entity.js";
 import { authorize, Permission } from "../rules/permissions.rules.js";
 import { parseInvitation } from "../rules/validation.rules.js";
-import { newId, type UseCaseDeps } from "./deps.use-case.js";
+import type { UseCaseDeps } from "./deps.use-case.js";
 
 const EMAIL_TAKEN = "Ya existe una cuenta con este correo.";
 const INVALID_EMPLOYEE = "Selecciona un empleado activo sin cuenta vinculada.";
@@ -49,8 +48,7 @@ export function createAccountUseCases({ uow, clock, notifier }: UseCaseDeps) {
             });
           name = fullName(employee);
         }
-        const user: User = {
-          id: newId(clock),
+        const user = await repositories.users.insert({
           name,
           email: data.email,
           role: data.role,
@@ -58,8 +56,7 @@ export function createAccountUseCases({ uow, clock, notifier }: UseCaseDeps) {
           employeeId: data.employeeId,
           passwordHash: null,
           createdAt: clock.now(),
-        };
-        await repositories.users.insert(user);
+        });
         return toPublicUser(user);
       });
       await notifier.invitationCreated(invited);

@@ -1,0 +1,116 @@
+// Esquema según "Diagrama ER Base de datos" (v0.4). Prisma no modela los CHECK
+// ni la columna generada `loans.active_device_id`: están en SQL manual dentro
+// de la migración inicial (ver README, "Base de datos").
+
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/db/generated/prisma"
+  moduleFormat           = "esm"
+  importFileExtension    = "js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// PK: UUID v7 generado por Prisma Client al insertar (@default(uuid(7))), guardado como CHAR(36).
+
+model Employee {
+  id         String   @id @default(uuid(7)) @db.Char(36)
+  firstName  String   @map("first_name") @db.VarChar(80)
+  lastName   String   @map("last_name") @db.VarChar(80)
+  nationalId String   @unique(map: "ux_employees_national_id") @map("national_id") @db.VarChar(20)
+  department String   @db.VarChar(80)
+  phone      String?  @db.VarChar(20)
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  loans Loan[]
+  user  User?
+
+  @@map("employees")
+}
+
+model Device {
+  id        String   @id @default(uuid(7)) @db.Char(36)
+  code      String   @unique(map: "ux_devices_code") @db.VarChar(30)
+  name      String   @db.VarChar(100)
+  type      String   @db.VarChar(40)
+  brand     String?  @db.VarChar(60)
+  model     String?  @db.VarChar(60)
+  // CHECK IN ('Disponible', 'Prestado')
+  status    String   @default("Disponible") @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  loans Loan[]
+
+  @@index([status], map: "ix_devices_status")
+  @@map("devices")
+}
+
+model Loan {
+  id                 String    @id @default(uuid(7)) @db.Char(36)
+  employeeId         String    @map("employee_id") @db.Char(36)
+  deviceId           String    @map("device_id") @db.Char(36)
+  registeredById     String    @map("registered_by_id") @db.Char(36)
+  returnedById       String?   @map("returned_by_id") @db.Char(36)
+  loanDate           DateTime  @map("loan_date") @db.Date
+  expectedReturnDate DateTime  @map("expected_return_date") @db.Date
+  actualReturnDate   DateTime? @map("actual_return_date") @db.Date
+  // CHECK IN ('Activo', 'Devuelto')
+  status             String    @default("Activo") @db.VarChar(20)
+  notes              String?   @db.VarChar(500)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  // Columna GENERADA en la migración (= device_id mientras status = 'Activo', si no NULL).
+  // Se declara solo para que Prisma no la borre; nunca se escribe ni se lee.
+  activeDeviceId     String?   @unique(map: "ux_loans_device_active") @map("active_device_id") @db.Char(36)
+
+  // Sin onDelete: Cascade. Empleados, equipos y usuarios se desactivan, no se borran.
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_loans_employee")
+  device       Device   @relation(fields: [deviceId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_loans_device")
+  registeredBy User     @relation("LoanRegisteredBy", fields: [registeredById], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_loans_registered_by")
+  returnedBy   User?    @relation("LoanReturnedBy", fields: [returnedById], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_loans_returned_by")
+
+  @@index([status, expectedReturnDate], map: "ix_loans_status_expected_return")
+  @@index([employeeId], map: "ix_loans_employee")
+  @@index([deviceId], map: "ix_loans_device")
+  @@index([registeredById], map: "ix_loans_registered_by")
+  @@index([returnedById], map: "ix_loans_returned_by")
+  @@map("loans")
+}
+
+model User {
+  id           String   @id @default(uuid(7)) @db.Char(36)
+  employeeId   String?  @unique(map: "ux_users_employee") @map("employee_id") @db.Char(36)
+  name         String   @db.VarChar(160)
+  email        String   @unique(map: "ux_users_email") @db.VarChar(255)
+  // NULL mientras la cuenta está 'Invitado'.
+  passwordHash String?  @map("password_hash") @db.VarChar(255)
+  // CHECK IN ('Encargado', 'Empleado')
+  role         String   @db.VarChar(20)
+  // CHECK IN ('Activo', 'Inactivo', 'Invitado'). Reemplaza a is_active del ER.
+  status       String   @default("Activo") @db.VarChar(20)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  employee      Employee? @relation(fields: [employeeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_users_employee")
+  loansRecorded Loan[]    @relation("LoanRegisteredBy")
+  loansReturned Loan[]    @relation("LoanReturnedBy")
+  sessions      Session[]
+
+  @@map("users")
+}
+
+model Session {
+  // SHA-256 en hex del token de la cookie; nunca el token en claro.
+  id             String   @id @db.VarChar(64)
+  userId         String   @map("user_id") @db.Char(36)
+  createdAt      DateTime @map("created_at")
+  lastActivityAt DateTime @map("last_activity_at")
+  expiresAt      DateTime @map("expires_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_sessions_user")
+
+  @@index([userId], map: "ix_sessions_user")
+  @@index([expiresAt], map: "ix_sessions_expires_at")
+  @@map("sessions")
+}

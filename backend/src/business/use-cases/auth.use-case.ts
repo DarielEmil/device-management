@@ -19,7 +19,7 @@ import {
   parseEmail,
   parseRegistration,
 } from "../rules/validation.rules.js";
-import { newId, type UseCaseDeps } from "./deps.use-case.js";
+import type { UseCaseDeps } from "./deps.use-case.js";
 
 export interface AuthResult {
   token: string;
@@ -90,8 +90,7 @@ export function createAuthUseCases({
       return uow.transaction(async (repositories) => {
         if (await repositories.users.findByEmail(data.email))
           throw new DomainError(EMAIL_TAKEN, DomainErrorCode.Conflict, { email: EMAIL_TAKEN });
-        const user: User = {
-          id: newId(clock),
+        const user = await repositories.users.insert({
           name: data.name,
           email: data.email,
           role: Role.Employee,
@@ -99,8 +98,7 @@ export function createAuthUseCases({
           employeeId: null,
           passwordHash,
           createdAt: clock.now(),
-        };
-        await repositories.users.insert(user);
+        });
         return openSession(repositories, user, options);
       });
     },

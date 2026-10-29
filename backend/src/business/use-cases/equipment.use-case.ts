@@ -7,7 +7,7 @@ import { DomainError, DomainErrorCode } from "../entities/errors.entity.js";
 import { Role, type Actor } from "../entities/user.entity.js";
 import { authorize, Permission } from "../rules/permissions.rules.js";
 import { parseEquipmentInput } from "../rules/validation.rules.js";
-import { newId, type UseCaseDeps } from "./deps.use-case.js";
+import type { UseCaseDeps } from "./deps.use-case.js";
 
 const DUPLICATE_CODE = "Ya existe un equipo con ese código de activo.";
 
@@ -24,14 +24,11 @@ export function createEquipmentUseCases({ uow, clock }: UseCaseDeps) {
         throw new DomainError(DUPLICATE_CODE, DomainErrorCode.Conflict, {
           code: DUPLICATE_CODE,
         });
-      const created: Equipment = {
-        id: newId(clock),
+      return equipment.insert({
         ...data,
         status: EquipmentStatus.Available,
         createdAt: clock.now(),
-      };
-      await equipment.insert(created);
-      return created;
+      });
     },
 
     async listEquipment(

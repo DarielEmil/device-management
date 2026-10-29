@@ -11,10 +11,21 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "check": "npm run lint && npm run typecheck && npm run test"
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "postinstall": "prisma generate",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:seed": "prisma db seed",
+    "prisma:reset": "prisma migrate reset",
+    "prisma:studio": "prisma studio"
   },
   "dependencies": {
+    "@prisma/adapter-mariadb": "7.10.1",
+    "@prisma/client": "7.10.1",
     "cors": "^2.8.5",
+    "dotenv": "18.0.9",
     "express": "^5.1.0"
   },
   "devDependencies": {
@@ -23,6 +34,7 @@
     "@types/node": "^22.0.0",
     "eslint": "^9.39.0",
     "jiti": "^2.7.0",
+    "prisma": "7.10.1",
     "tsx": "^4.20.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.50.0",

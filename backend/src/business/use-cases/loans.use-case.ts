@@ -7,7 +7,6 @@ import {
 } from "../entities/errors.entity.js";
 import {
   LoanStatus,
-  type Loan,
   type LoanDisplayStatus,
   type LoanInput,
   type LoanView,
@@ -17,7 +16,7 @@ import type { Repositories } from "../ports/repositories.js";
 import { byDueOn, toLoanView } from "../rules/loans.rules.js";
 import { authorize, Permission } from "../rules/permissions.rules.js";
 import { parseLoanInput } from "../rules/validation.rules.js";
-import { newId, type UseCaseDeps } from "./deps.use-case.js";
+import type { UseCaseDeps } from "./deps.use-case.js";
 
 const INACTIVE_EMPLOYEE = "Selecciona un empleado activo.";
 const UNAVAILABLE_EQUIPMENT = "El equipo seleccionado no está disponible.";
@@ -79,17 +78,17 @@ export function createLoanUseCases({ uow, clock }: UseCaseDeps) {
             equipmentId: UNAVAILABLE_EQUIPMENT,
           });
 
-        const loan: Loan = {
-          id: newId(clock),
+        const loan = await repositories.loans.insert({
           employeeId: employee.id,
           equipmentId: equipment.id,
           borrowedOn: today,
           dueOn: data.dueOn,
           returnedOn: null,
           status: LoanStatus.Active,
+          registeredById: actor.userId,
+          returnedById: null,
           createdAt: clock.now(),
-        };
-        await repositories.loans.insert(loan);
+        });
         await repositories.equipment.updateStatus(equipment.id, EquipmentStatus.Loaned);
         return {
           ...loan,
@@ -110,9 +109,14 @@ export function createLoanUseCases({ uow, clock }: UseCaseDeps) {
           throw new DomainError("El préstamo no existe.", DomainErrorCode.NotFound);
         if (loan.status === LoanStatus.Returned)
           throw new DomainError("Este préstamo ya fue devuelto.", DomainErrorCode.Conflict);
-        await repositories.loans.markReturned(loan.id, today);
+        await repositories.loans.markReturned(loan.id, today, actor.userId);
         await repositories.equipment.updateStatus(loan.equipmentId, EquipmentStatus.Available);
-        return { ...loan, returnedOn: today, status: LoanStatus.Returned };
+        return {
+          ...loan,
+          returnedOn: today,
+          returnedById: actor.userId,
+          status: LoanStatus.Returned,
+        };
       });
       return toLoanView(returned, today);
     },
