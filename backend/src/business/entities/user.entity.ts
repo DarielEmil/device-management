@@ -57,3 +57,7 @@ export interface InvitationInput {
   role: string;
   employeeId?: string;
 }
+
+export interface LinkEmployeeInput {
+  employeeId: string;
+}

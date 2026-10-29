@@ -62,4 +62,25 @@ describe("HTTP contra MySQL", () => {
     expect((await post("/api/auth/logout")).status).toBe(204);
     expect((await get("/api/auth/session")).status).toBe(401);
   });
+
+  it("el Encargado vincula una cuenta a un empleado y un segundo vínculo responde 409", async () => {
+    const manager = await repositories.users.insert(
+      userFixture({ passwordHash: await createScryptPasswordHasher().hash(PASSWORD) }),
+    );
+    const employee = await repositories.employees.insert(employeeFixture());
+    const first = await repositories.users.insert(userFixture({ role: "employee", name: "Cuenta registrada" }));
+    const second = await repositories.users.insert(userFixture({ role: "employee" }));
+
+    const login = await request(app).post("/api/auth/login").set("Origin", ORIGIN).send({ email: manager.email, password: PASSWORD });
+    const cookie = `dm_session=${tokenOf(sessionCookie(login.headers["set-cookie"]))}`;
+    const link = (id: string) =>
+      request(app).post(`/api/accounts/${id}/link-employee`).set("Cookie", cookie).set("Origin", ORIGIN).send({ employeeId: employee.id });
+
+    const linked = await link(first.id);
+    expect(linked.status).toBe(200);
+    expect(expectContract(contract.account, linked.body).data).toMatchObject({ name: "Cuenta registrada", employeeId: employee.id });
+    const again = await link(second.id);
+    expect(again.status).toBe(409);
+    expect(again.body.fields).toEqual({ employeeId: "Selecciona un empleado activo sin cuenta vinculada." });
+  });
 });

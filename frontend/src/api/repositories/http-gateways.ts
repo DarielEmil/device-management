@@ -100,6 +100,15 @@ export function createHttpGateways(baseUrl: string | undefined): Gateways {
           await request("/invitations", { method: "POST", body }),
         ).data;
       },
+      async linkEmployee(id, employeeId) {
+        return decode(
+          accountDto,
+          await request(`/accounts/${encodeURIComponent(id)}/link-employee`, {
+            method: "POST",
+            body: { employeeId },
+          }),
+        ).data;
+      },
       async deactivate(id) {
         return decode(
           accountDto,

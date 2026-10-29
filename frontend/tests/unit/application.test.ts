@@ -306,6 +306,65 @@ describe("autenticación y acceso por rol (simulación)", () => {
       }),
     ).rejects.toMatchObject({ fields: { employeeId: expect.any(String) } });
   });
+  it("vincula una cuenta registrada a un empleado y la cuenta ve sus préstamos", async () => {
+    const app = setup();
+    const { account } = await app.register({
+      name: "Pedro R.",
+      email: "pedro.ramirez@empresa.com",
+      password: DEMO_PASSWORD,
+    });
+    expect((await app.load()).loans).toEqual([]);
+    await app.logout();
+    await app.login(managerCredentials);
+    const employee = await app.registerEmployee(newEmployee);
+    await app.createLoan({ ...newLoan, employeeId: employee.id });
+    const linked = await app.linkEmployee(account.id, employee.id);
+    expect(linked).toMatchObject({ id: account.id, name: "Pedro R.", employeeId: employee.id });
+    await app.logout();
+    await app.login({ email: "pedro.ramirez@empresa.com", password: DEMO_PASSWORD });
+    const loans = (await app.load()).loans;
+    expect(loans).toHaveLength(1);
+    expect(loans[0]?.employeeId).toBe(employee.id);
+  });
+  it("rechaza cada condición del vínculo con el código y el campo del backend", async () => {
+    const app = await manager();
+    const employee = await app.registerEmployee(newEmployee);
+    const field = { employeeId: "Selecciona un empleado activo sin cuenta vinculada." };
+    await expect(app.linkEmployee("user-laura", " ")).rejects.toMatchObject({
+      fields: { employeeId: "El empleado es obligatorio." },
+    });
+    await expect(app.linkEmployee("no-existe", employee.id)).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      fields: {},
+    });
+    await expect(app.linkEmployee("user-laura", "no-existe")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      fields: field,
+    });
+    await expect(app.linkEmployee("user-emp-sofia", employee.id)).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "La cuenta está inactiva.",
+    });
+    await expect(app.linkEmployee("user-emp-ana", employee.id)).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "La cuenta ya tiene un empleado vinculado.",
+    });
+    await expect(app.linkEmployee("user-laura", "emp-ana")).rejects.toMatchObject({
+      code: "CONFLICT",
+      fields: field,
+    });
+    await expect(app.linkEmployee("user-laura", "emp-sofia")).rejects.toMatchObject({
+      code: "CONFLICT",
+      fields: field,
+    });
+  });
+  it("el empleado no puede vincular cuentas", async () => {
+    const app = setup();
+    await app.login(employeeCredentials);
+    await expect(app.linkEmployee("user-laura", "emp-carlos")).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+  });
   it("las rutas administrativas no están disponibles al empleado", () => {
     expect(canAccess(Role.Employee, "/users")).toBe(false);
     expect(canAccess(Role.Employee, "/inventory")).toBe(false);

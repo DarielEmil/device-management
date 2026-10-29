@@ -33,11 +33,11 @@ model Employee {
 
 model Device {
   id        String   @id @default(uuid(7)) @db.Char(36)
-  code      String   @unique(map: "ux_devices_code") @db.VarChar(30)
-  name      String   @db.VarChar(100)
+  code      String   @unique(map: "ux_devices_code") @db.VarChar(40)
+  name      String   @db.VarChar(120)
   type      String   @db.VarChar(40)
-  brand     String?  @db.VarChar(60)
-  model     String?  @db.VarChar(60)
+  brand     String?  @db.VarChar(80)
+  model     String?  @db.VarChar(80)
   // CHECK IN ('Disponible', 'Prestado')
   status    String   @default("Disponible") @db.VarChar(20)
   createdAt DateTime @default(now()) @map("created_at")

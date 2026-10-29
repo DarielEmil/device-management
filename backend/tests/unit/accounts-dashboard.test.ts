@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { EquipmentStatus, EquipmentType } from "../../src/business/entities/equipment.entity.js";
 import { DomainErrorCode } from "../../src/business/entities/errors.entity.js";
 import { LoanStatus } from "../../src/business/entities/loan.entity.js";
-import { Role, UserStatus } from "../../src/business/entities/user.entity.js";
+import { actorFrom, Role, UserStatus } from "../../src/business/entities/user.entity.js";
 import { hashSessionToken } from "../../src/business/rules/security.rules.js";
 import { expectDomainError } from "../support/expect-domain-error.js";
 import { DEMO_PASSWORD, setup } from "../support/setup.js";
@@ -133,6 +133,102 @@ describe("cuentas", () => {
     });
   });
 
+  it("vincula una cuenta sin empleado a un empleado activo sin cuenta, sin cambiar el nombre", async () => {
+    const { useCases, manager, addEmployee, addUser, uow } = setup();
+    const marta = addEmployee({ firstName: "Marta", lastName: "López" });
+    const registered = addUser({ name: "Marta L.", email: "marta@empresa.com" });
+    const invited = addUser({ status: UserStatus.Invited, passwordHash: null });
+    const linked = await useCases.accounts.linkEmployee(manager, registered.id, { employeeId: marta.id });
+    expect(linked).toMatchObject({ id: registered.id, name: "Marta L.", employeeId: marta.id });
+    expect(linked).not.toHaveProperty("passwordHash");
+    expect(uow.store.users.get(registered.id)?.employeeId).toBe(marta.id);
+
+    const pedro = addEmployee({ firstName: "Pedro" });
+    await useCases.accounts.linkEmployee(manager, invited.id, { employeeId: pedro.id });
+    expect(uow.store.users.get(invited.id)?.employeeId).toBe(pedro.id);
+  });
+
+  it("al vincular, la cuenta Empleado ve los préstamos de ese empleado", async () => {
+    const { useCases, manager, addEmployee, addUser, addEquipment, addLoan, uow } = setup();
+    const marta = addEmployee({ firstName: "Marta", lastName: "López" });
+    const loan = addLoan({ employeeId: marta.id, equipmentId: addEquipment().id });
+    const account = addUser({ email: "marta@empresa.com" });
+    expect(await useCases.loans.listLoans(actorFrom(account), {})).toEqual([]);
+    await useCases.accounts.linkEmployee(manager, account.id, { employeeId: marta.id });
+    // La sesión reconstruye el actor desde la cuenta guardada en cada petición.
+    const stored = uow.store.users.get(account.id);
+    if (!stored) throw new Error("Falta la cuenta");
+    const mine = await useCases.loans.listLoans(actorFrom(stored), {});
+    expect(mine.map((item) => item.id)).toEqual([loan.id]);
+  });
+
+  it("rechaza cada condición del vínculo con su código y campo", async () => {
+    const { useCases, manager, ana, employeeUser, addEmployee, addUser } = setup();
+    const field = { employeeId: "Selecciona un empleado activo sin cuenta vinculada." };
+    const free = addEmployee({ firstName: "Libre" });
+    const account = addUser();
+    await expectDomainError(useCases.accounts.linkEmployee(manager, "no-existe", { employeeId: free.id }), {
+      code: DomainErrorCode.NotFound,
+      fields: {},
+    });
+    await expectDomainError(useCases.accounts.linkEmployee(manager, account.id, { employeeId: "no-existe" }), {
+      code: DomainErrorCode.NotFound,
+      fields: field,
+    });
+    await expectDomainError(useCases.accounts.linkEmployee(manager, account.id, { employeeId: "  " }), {
+      code: DomainErrorCode.Validation,
+      fields: { employeeId: "El empleado es obligatorio." },
+    });
+    const inactiveAccount = addUser({ status: UserStatus.Inactive });
+    await expectDomainError(useCases.accounts.linkEmployee(manager, inactiveAccount.id, { employeeId: free.id }), {
+      code: DomainErrorCode.Conflict,
+      message: "La cuenta está inactiva.",
+      fields: {},
+    });
+    await expectDomainError(useCases.accounts.linkEmployee(manager, employeeUser.id, { employeeId: free.id }), {
+      code: DomainErrorCode.Conflict,
+      message: "La cuenta ya tiene un empleado vinculado.",
+      fields: {},
+    });
+    const inactive = addEmployee({ active: false });
+    await expectDomainError(useCases.accounts.linkEmployee(manager, account.id, { employeeId: inactive.id }), {
+      code: DomainErrorCode.Conflict,
+      fields: field,
+    });
+    await expectDomainError(useCases.accounts.linkEmployee(manager, account.id, { employeeId: ana.id }), {
+      code: DomainErrorCode.Conflict,
+      fields: field,
+    });
+  });
+
+  it("dos vínculos simultáneos al mismo empleado: solo uno se aplica", async () => {
+    const { useCases, manager, addEmployee, addUser, uow } = setup();
+    const marta = addEmployee({ firstName: "Marta" });
+    const first = addUser();
+    const second = addUser();
+    const results = await Promise.allSettled([
+      useCases.accounts.linkEmployee(manager, first.id, { employeeId: marta.id }),
+      useCases.accounts.linkEmployee(manager, second.id, { employeeId: marta.id }),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect([...uow.store.users.values()].filter((user) => user.employeeId === marta.id)).toHaveLength(1);
+  });
+
+  it("si otra cuenta toma al empleado justo antes del update, responde CONFLICT en employeeId", async () => {
+    const { useCases, manager, addEmployee, addUser, uow } = setup();
+    const marta = addEmployee({ firstName: "Marta" });
+    const account = addUser();
+    // Simula una transacción concurrente: la restricción única de la DB detiene el vínculo.
+    uow.beforeWrite = (operation) => {
+      if (operation === "users.linkEmployee") addUser({ employeeId: marta.id });
+    };
+    await expectDomainError(useCases.accounts.linkEmployee(manager, account.id, { employeeId: marta.id }), {
+      code: DomainErrorCode.Conflict,
+      fields: { employeeId: expect.any(String) },
+    });
+    expect(uow.store.users.get(account.id)?.employeeId).toBeNull();
+  });
+
   it("solo el Encargado gestiona cuentas", async () => {
     const { useCases, employee, managerUser } = setup();
     await expectDomainError(useCases.accounts.listAccounts(employee), { code: DomainErrorCode.Forbidden });
@@ -141,6 +237,9 @@ describe("cuentas", () => {
       { code: DomainErrorCode.Forbidden },
     );
     await expectDomainError(useCases.accounts.deactivateAccount(employee, managerUser.id), {
+      code: DomainErrorCode.Forbidden,
+    });
+    await expectDomainError(useCases.accounts.linkEmployee(employee, employee.userId, { employeeId: "x" }), {
       code: DomainErrorCode.Forbidden,
     });
   });

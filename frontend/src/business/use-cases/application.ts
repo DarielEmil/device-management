@@ -12,6 +12,7 @@ import {
   employeeInputSchema,
   equipmentInputSchema,
   inviteInputSchema,
+  linkEmployeeInputSchema,
   loanInputSchema,
   loginInputSchema,
   registerInputSchema,
@@ -177,6 +178,12 @@ export function createApplication(
           employeeId: "El empleado ya tiene una cuenta vinculada.",
         });
       return gateways.accounts.invite(input);
+    },
+    // Las reglas del vínculo (cuenta y empleado) las aplica el backend.
+    async linkEmployee(id: string, employeeId: string) {
+      requireManager();
+      const input = validate(linkEmployeeInputSchema, { employeeId });
+      return gateways.accounts.linkEmployee(id, input.employeeId);
     },
     async deactivateUser(id: string) {
       const actor = requireManager();

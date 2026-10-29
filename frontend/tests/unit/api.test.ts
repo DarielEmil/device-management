@@ -87,6 +87,16 @@ describe("adaptadores HTTP", () => {
     expect(config?.data).toBe(JSON.stringify({ code: "EQ-006", name: "Dell", type: "Laptop", brand: "", model: "" }));
     expect(config?.headers.get("Content-Type")).toBe("application/json");
   });
+  it("vincula una cuenta con POST /accounts/:id/link-employee", async () => {
+    const account = createSeed().accounts[0];
+    reply(200, { data: { ...account, employeeId: "emp-1" } });
+    await expect(
+      createHttpGateways("/api").accounts.linkEmployee("user 1", "emp-1"),
+    ).resolves.toMatchObject({ employeeId: "emp-1" });
+    const config = adapter.mock.calls[0]?.[0];
+    expect(config).toMatchObject({ url: "/accounts/user%201/link-employee", method: "post" });
+    expect(config?.data).toBe(JSON.stringify({ employeeId: "emp-1" }));
+  });
   it("una sesión no autenticada retorna null", async () => {
     reply(401, {});
     await expect(createHttpGateways("/api").auth.current()).resolves.toBeNull();

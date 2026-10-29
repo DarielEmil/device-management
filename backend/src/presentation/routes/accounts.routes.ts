@@ -8,6 +8,7 @@ export function createAccountsRouter(accounts: AccountUseCases, session: Request
   const router = Router();
   router.use(session);
   router.get("/", controller.list);
+  router.post("/:id/link-employee", controller.linkEmployee);
   router.post("/:id/deactivate", controller.deactivate);
   return router;
 }

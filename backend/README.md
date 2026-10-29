@@ -73,6 +73,7 @@ Rutas, cuerpos y errores siguen el contrato del frontend (`frontend/src/api/`), 
 | `POST /api/loans/:id/return` | CU-04 `returnLoan` | Encargado | `200 { data: Loan }` |
 | `GET /api/accounts` | `accounts.listAccounts` | Encargado | `200 { data: Account[] }` |
 | `POST /api/invitations` | `accounts.inviteAccount` | Encargado | `201 { data: Account }` |
+| `POST /api/accounts/:id/link-employee` | `accounts.linkEmployee` | Encargado | `200 { data: Account }`; cuerpo `{ employeeId }` |
 | `POST /api/accounts/:id/deactivate` | `accounts.deactivateAccount` | Encargado | `200 { data: Account }` |
 | `GET /api/dashboard` | `dashboard.getDashboard` | ambos | `200 { data: Dashboard }` |
 
@@ -156,7 +157,7 @@ ESLint (`eslint.config.mts`) hace cumplir las dependencias: negocio no importa p
 | `employees` | `registerEmployee` (CU-02), `listEmployees` | Encargado |
 | `loans` | `createLoan` (CU-03), `returnLoan` (CU-04), `listLoans` (CU-06) | Registrar y devolver: Encargado. Consultar: ambos; el Empleado solo ve los suyos |
 | `auth` | `register`, `login`, `logout`, `getCurrentSession`, `requestPasswordRecovery` | Público |
-| `accounts` | `listAccounts`, `inviteAccount`, `deactivateAccount` | Encargado |
+| `accounts` | `listAccounts`, `inviteAccount`, `linkEmployee`, `deactivateAccount` | Encargado |
 | `dashboard` | `getDashboard` | Ambos; el Empleado sin indicadores del inventario |
 
 Reglas principales:
@@ -173,6 +174,7 @@ Reglas principales:
   - Contraseñas con scrypt (parámetros de OWASP). Mismo error y mismo costo para correo inexistente, contraseña incorrecta o cuenta no activa.
 - **Cuentas:**
   - Invitar crea una cuenta `Invitado` sin contraseña.
+  - Vincular empleado (`linkEmployee`): el Encargado asocia una cuenta existente sin empleado (`Invitado` o `Activo`, de cualquier rol) a un empleado activo sin cuenta. Solo vincula: no desvincula ni cambia el empleado, y el nombre de la cuenta no cambia. Es una transacción que bloquea la fila del empleado (`findByIdForUpdate`); el índice `ux_users_employee` y el `update` condicional (`employee_id IS NULL`) cubren las carreras. Errores: cuenta inexistente `NOT_FOUND`; `employeeId` vacío `VALIDATION`; cuenta `Inactivo` o ya vinculada `CONFLICT` sin campo; empleado inexistente `NOT_FOUND` y empleado inactivo o con otra cuenta `CONFLICT`, ambos con `employeeId: "Selecciona un empleado activo sin cuenta vinculada."`.
   - Desactivar es una baja lógica: la cuenta pasa a `Inactivo`, su empleado se desactiva y sus sesiones se cierran. Sus préstamos activos se conservan (se devuelven con CU-04) y ya no puede recibir préstamos nuevos. No se puede desactivar la propia cuenta.
 
 ### Decisiones abiertas del issue #5 y valor tomado
@@ -180,7 +182,7 @@ Reglas principales:
 | Decisión | Valor actual | Dónde cambiarlo |
 | --- | --- | --- |
 | Duración de la sesión | 30 min de inactividad, tope de 12 h | `DEFAULT_SESSION_POLICY` o `sessionPolicy` en `createUseCases` |
-| ¿Todo empleado tiene cuenta? | No. Una cuenta puede no tener empleado y viceversa | — |
+| ¿Todo empleado tiene cuenta? | No. Una cuenta puede no tener empleado y viceversa; el Encargado vincula una cuenta existente a un empleado activo sin cuenta | `accounts.linkEmployee` |
 | ¿El Empleado solo ve sus préstamos? | Sí, como el frontend | `loanScope` en `use-cases/loans.ts` |
 | ¿Estado "Vencido"? | No. Se usa `Atrasado`, derivado, como el frontend | `rules/loans.ts` |
 | Recuperación de contraseña | Solo avisa por `AccountNotifier`. Falta definir el proveedor de correo y dónde guardar el token de recuperación | — |
@@ -190,4 +192,4 @@ Reglas principales:
 `npm test` corre los tests de `tests/unit/` con vitest. Usan los ports falsos de `tests/support/in-memory.ts`, que aplican las restricciones únicas, serializan las transacciones y revierten si una falla. Así se prueban la atomicidad y los préstamos simultáneos sin base de datos.
 
 - `tests/unit/http-*.test.ts`: la app Express con supertest sobre esos fakes (auth y cookie, RBAC, errores, CSRF, préstamo y devolución, cuentas, dashboard). Validan las respuestas con una copia de los esquemas del frontend (`tests/support/frontend-contract.ts`); si el contrato cambia en `frontend/src/business/entities/models.ts`, hay que actualizarla.
-- `tests/integration/http.test.ts`: humo contra MySQL con la composición real (`createContainer`): login, listar equipos, prestar, devolver y logout.
+- `tests/integration/http.test.ts`: humo contra MySQL con la composición real (`createContainer`): login, listar equipos, prestar, devolver y logout; y vincular una cuenta a un empleado (un segundo vínculo al mismo empleado responde 409).

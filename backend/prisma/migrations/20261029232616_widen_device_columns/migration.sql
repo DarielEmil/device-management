@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE `devices` MODIFY `code` VARCHAR(40) NOT NULL,
+    MODIFY `name` VARCHAR(120) NOT NULL,
+    MODIFY `brand` VARCHAR(80) NULL,
+    MODIFY `model` VARCHAR(80) NULL;

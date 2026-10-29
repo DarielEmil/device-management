@@ -85,6 +85,53 @@ describe("restricciones únicas", () => {
   });
 });
 
+describe("vincular cuenta con empleado", () => {
+  const useCasesFor = () =>
+    createUseCases({ uow, clock: createFakeClock(), passwordHasher: createFakePasswordHasher(), notifier: createRecordingNotifier() });
+
+  it("vincula y un segundo vínculo al mismo empleado responde CONFLICT en employeeId", async () => {
+    const manager = actorFrom(await repositories.users.insert(userFixture()));
+    const employee = await repositories.employees.insert(employeeFixture());
+    const first = await repositories.users.insert(userFixture({ role: Role.Employee, name: "Cuenta 1" }));
+    const second = await repositories.users.insert(userFixture({ role: Role.Employee }));
+    const useCases = useCasesFor();
+
+    const linked = await useCases.accounts.linkEmployee(manager, first.id, { employeeId: employee.id });
+    expect(linked).toMatchObject({ id: first.id, name: "Cuenta 1", employeeId: employee.id });
+    expect((await repositories.users.findById(first.id))?.employeeId).toBe(employee.id);
+    await expectDomainError(useCases.accounts.linkEmployee(manager, second.id, { employeeId: employee.id }), {
+      code: DomainErrorCode.Conflict,
+      fields: { employeeId: expect.any(String) },
+    });
+  });
+
+  it("la DB rechaza el vínculo duplicado y no sobrescribe una cuenta ya vinculada", async () => {
+    const employee = await repositories.employees.insert(employeeFixture());
+    const other = await repositories.employees.insert(employeeFixture());
+    const first = await repositories.users.insert(userFixture());
+    const second = await repositories.users.insert(userFixture());
+    await repositories.users.linkEmployee(first.id, employee.id);
+    await expectDomainError(repositories.users.linkEmployee(second.id, employee.id), {
+      code: DomainErrorCode.Conflict,
+      fields: { employeeId: expect.any(String) },
+    });
+    await expectDomainError(repositories.users.linkEmployee(first.id, other.id), { code: DomainErrorCode.Conflict });
+    expect((await repositories.users.findById(first.id))?.employeeId).toBe(employee.id);
+  });
+
+  it("dos vínculos simultáneos al mismo empleado: solo uno se aplica", async () => {
+    const manager = actorFrom(await repositories.users.insert(userFixture()));
+    const employee = await repositories.employees.insert(employeeFixture());
+    const accounts = await Promise.all([repositories.users.insert(userFixture()), repositories.users.insert(userFixture())]);
+    const useCases = useCasesFor();
+    const results = await Promise.allSettled(
+      accounts.map((account) => useCases.accounts.linkEmployee(manager, account.id, { employeeId: employee.id })),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(await prisma.user.count({ where: { employeeId: employee.id } })).toBe(1);
+  });
+});
+
 describe("un solo préstamo activo por equipo", () => {
   it("la DB rechaza un segundo préstamo Activo y acepta uno nuevo tras la devolución", async () => {
     const { manager, employee, equipment } = await loanParties();
@@ -147,5 +194,19 @@ describe("transacciones", () => {
     ).rejects.toThrow("falla a mitad");
     expect(insertedId).toMatch(UUID_V7);
     expect(await repositories.equipment.findById(insertedId)).toBeNull();
+  });
+});
+
+describe("tamaños de columna", () => {
+  it("acepta equipos con los largos máximos que permite la validación", async () => {
+    const equipment = await repositories.equipment.insert(
+      equipmentFixture({ code: "X".repeat(40), name: "N".repeat(120), brand: "B".repeat(80), model: "M".repeat(80) }),
+    );
+    expect(await repositories.equipment.findById(equipment.id)).toMatchObject({
+      code: "X".repeat(40),
+      name: "N".repeat(120),
+      brand: "B".repeat(80),
+      model: "M".repeat(80),
+    });
   });
 });

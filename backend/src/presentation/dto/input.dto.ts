@@ -40,6 +40,8 @@ export const invitationInputDto = z.object({
   employeeId: z.string().nullable().optional(),
 });
 
+export const linkEmployeeInputDto = z.object({ employeeId: text });
+
 export const equipmentQueryDto = z.object({ status: z.enum(EquipmentStatus).optional() });
 
 export const loanQueryDto = z.object({

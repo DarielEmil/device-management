@@ -1,3 +1,4 @@
+import { DomainError, DomainErrorCode } from "../../business/entities/errors.entity.js";
 import type { User } from "../../business/entities/user.entity.js";
 import type { UserRepository } from "../../business/ports/repositories.js";
 import { translateUniqueViolation } from "../errors.js";
@@ -52,6 +53,14 @@ export function createUserRepository(db: Db): UserRepository {
     },
     async updateStatus(id, status) {
       await db.user.update({ where: { id }, data: { status: userStatus.toDb(status) } });
+    },
+    async linkEmployee(id, employeeId) {
+      // Condicional: si otra transacción ya vinculó la cuenta, no se sobrescribe.
+      const { count } = await translateUniqueViolation(() =>
+        db.user.updateMany({ where: { id, employeeId: null }, data: { employeeId } }),
+      );
+      if (count === 0)
+        throw new DomainError("La cuenta ya tiene un empleado vinculado.", DomainErrorCode.Conflict);
     },
   };
 }

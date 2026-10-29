@@ -72,7 +72,7 @@ Escenarios:
 - `error`: login funciona, pero las consultas fallan para probar carga/error/reintento.
 - `unavailable`: el selector muestra equipos disponibles y la confirmación simula un conflicto.
 
-Los mocks soportan registros, duplicados, préstamos, devolución, invitación y desactivación. No envían correos ni implementan activación de invitaciones. Las invitaciones quedan `invited`; recuperación muestra feedback de simulación. El registro público siempre crea una cuenta `employee` sin vínculo automático a otra persona. No hay edición de vínculos de cuentas existentes en este alcance.
+Los mocks soportan registros, duplicados, préstamos, devolución, invitación, vínculo de cuenta con empleado y desactivación. No envían correos ni implementan activación de invitaciones. Las invitaciones quedan `invited`; recuperación muestra feedback de simulación. El registro público siempre crea una cuenta `employee` sin vínculo automático a otra persona. El Encargado vincula después esa cuenta (o una invitada sin empleado) a un empleado activo sin cuenta desde *Usuarios → Cuentas → Vincular empleado*; el vínculo no se puede quitar ni cambiar en este alcance.
 
 Los indicadores se calculan con los registros existentes, no con los totales ilustrativos 128/83/45/7. Teléfono es opcional, siguiendo el caso de error detallado del plan. El diseño usa los colores exactos y tipografía de Stitch, sidebar 232 px, escritorio de referencia 1440 px y tablas con scroll en ventanas estrechas; no incluye layouts mobile.
 
@@ -80,7 +80,7 @@ Los indicadores se calculan con los registros existentes, no con los totales ilu
 
 - Dashboard por rol; sin KPIs administrativos para empleados.
 - Inventario: filtros, búsqueda, paginación, registro y préstamo desde una fila disponible.
-- Usuarios: pestañas Cuentas / Empleados, registro, invitación simulada y desactivación.
+- Usuarios: pestañas Cuentas / Empleados, registro, invitación simulada, vínculo de cuenta con empleado y desactivación. La tabla de cuentas muestra el empleado vinculado; la acción "Vincular empleado" aparece solo en cuentas no inactivas y sin empleado, y el selector lista solo empleados activos sin cuenta.
 - Préstamos: Activos / Devueltos / Todos, filtros, creación y devolución confirmada.
 - Empleado: solo catálogo disponible y préstamos propios.
 - Errores inline, formularios tipados, estados vacíos, skeletons, foco visible, modales con Escape y foco contenido, y selectores buscables por teclado.
@@ -103,6 +103,7 @@ Todavía **no hay backend**. Los adaptadores HTTP son una propuesta de contrato 
 | POST       | `/loans/:id/return`             | `Loan`                                                    |
 | GET        | `/accounts`                     | `Account[]`                                               |
 | POST       | `/invitations`                  | `Account` con estado `invited`                            |
+| POST       | `/accounts/:id/link-employee`   | `Account`; cuerpo `{ employeeId }`                        |
 | POST       | `/accounts/:id/deactivate`      | `Account`                                                 |
 
 Entidades y formularios: `src/business/entities/models.ts` y `src/business/rules/validation.ts`. Un préstamo incluye `equipmentCode`, `equipmentName` y `employeeName` para no requerir acceso al inventario administrativo. El backend debe devolver estas relaciones con el préstamo. Para Empleado, `GET /equipment` solo devuelve disponibles y `GET /loans` solo préstamos propios; no se consulta `/accounts` ni `/employees`.
@@ -118,7 +119,7 @@ npx playwright install chromium
 npm run test:e2e       # Levanta su propio servidor mock en devices.localhost:3100
 ```
 
-Playwright verifica login, registro, inventario, duplicados, préstamos, devoluciones, empleados, invitaciones, desactivación, permisos y teclado. Capturas en `test-results/`, informe en `playwright-report/`.
+Playwright verifica login, registro, inventario, duplicados, préstamos, devoluciones, empleados, invitaciones, vínculo de cuenta con empleado, desactivación, permisos y teclado. Capturas en `test-results/`, informe en `playwright-report/`.
 
 Para ejecutar un build de demo con `npm start`, compilar con `NEXT_PUBLIC_APP_ENV=local` (o `.env.local`). Para integración real, compilar con `NEXT_PUBLIC_APP_ENV=production` y la URL de API configurada. La API todavía no existe: sin ella se muestra el error correspondiente, no datos simulados.
 
