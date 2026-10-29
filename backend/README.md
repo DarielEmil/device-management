@@ -1,12 +1,13 @@
 # Device Management — Backend
 
-API REST del monolito. **Node.js 22, Express 5 y TypeScript estricto.** Convive con `../frontend` en el mismo repositorio y sirve en `http://localhost:8080/api`, la URL que el frontend espera en `NEXT_PUBLIC_API_BASE_URL`.
+API REST del monolito. **Node.js 22, Express 5 y TypeScript estricto.** Convive con `../frontend` en el mismo repositorio y sirve en `http://127.0.0.1:8080/api`, la URL de `NEXT_PUBLIC_API_BASE_URL` en `frontend/.env.example` (ver "Cookie de sesión": front y API deben estar en el mismo host).
 
 ## Ejecutar en local
 
 ```sh
 npm ci
 cp .env.example .env
+docker compose up -d && npm run prisma:migrate && npm run prisma:seed   # ver "Base de datos"
 npm run dev      # tsx watch
 npm run check    # lint + typecheck + tests
 npm run build && npm start
@@ -51,6 +52,72 @@ npm run test:integration      # tests contra MySQL, en la base <MYSQL_DATABASE>_
 - **Transacciones:** `createPrismaUnitOfWork` usa `prisma.$transaction` con `READ COMMITTED`, para que después de un `FOR UPDATE` las lecturas vean lo último confirmado.
 - **Errores:** una violación de índice único se traduce a `DomainError CONFLICT` con el mismo campo y mensaje que usa negocio (`db/errors.ts`).
 
+## API HTTP
+
+Rutas, cuerpos y errores siguen el contrato del frontend (`frontend/src/api/`), no las rutas en español de `Arquitectura` §5.2. Toda respuesta con datos usa el sobre `{ data: ... }`; los errores, `{ message, fields }` con los mensajes en español de negocio.
+
+| Método y ruta | Caso de uso | Rol | Respuesta |
+| --- | --- | --- | --- |
+| `GET /api/health` | — | público | `200 { data: { status } }` |
+| `POST /api/auth/register` | `auth.register` | público | `201 { data: { account } }` + cookie |
+| `POST /api/auth/login` | `auth.login` | público | `200 { data: { account } }` + cookie |
+| `POST /api/auth/logout` | `auth.logout` | público | `204`, borra la cookie y la sesión |
+| `GET /api/auth/session` | `auth.getCurrentSession` | sesión | `200 { data: { account } }` o `401` |
+| `POST /api/auth/recover` | `auth.requestPasswordRecovery` | público | `204` exista o no el correo |
+| `GET /api/equipment?status=` | `equipment.listEquipment` | ambos | `200 { data: Equipment[] }` |
+| `POST /api/equipment` | CU-01 `registerEquipment` | Encargado | `201 { data: Equipment }` |
+| `GET /api/employees` | `employees.listEmployees` | Encargado | `200 { data: Employee[] }` |
+| `POST /api/employees` | CU-02 `registerEmployee` | Encargado | `201 { data: Employee }` |
+| `GET /api/loans?status=&employeeId=` | CU-06 `listLoans` | ambos | `200 { data: Loan[] }` |
+| `POST /api/loans` | CU-03 `createLoan` | Encargado | `201 { data: Loan }` |
+| `POST /api/loans/:id/return` | CU-04 `returnLoan` | Encargado | `200 { data: Loan }` |
+| `GET /api/accounts` | `accounts.listAccounts` | Encargado | `200 { data: Account[] }` |
+| `POST /api/invitations` | `accounts.inviteAccount` | Encargado | `201 { data: Account }` |
+| `POST /api/accounts/:id/deactivate` | `accounts.deactivateAccount` | Encargado | `200 { data: Account }` |
+| `GET /api/dashboard` | `dashboard.getDashboard` | ambos | `200 { data: Dashboard }` |
+
+- **Salida:** mappers explícitos en `presentation/dto/output.dto.ts` (`Equipment`, `Employee`, `Account`, `Loan`, `Session = { account }`, `Dashboard`); nunca salen `passwordHash`, `createdAt` ni los ids de quien registró. `Loan.status` es el estado mostrado (`active`, `due_soon`, `overdue`, `returned`).
+- **Entrada:** los DTOs zod (`presentation/dto/input.dto.ts`) solo validan tipos. Un campo ausente llega como `""` a negocio, que devuelve el mensaje del campo. `?status=` admite los mismos valores en inglés del contrato.
+- **Permisos:** presentación solo exige sesión (`requireSession`) y pasa el `Actor`; el rol lo decide negocio con `authorize`.
+
+| Error | HTTP |
+| --- | --- |
+| `DomainError` `VALIDATION`, JSON inválido, cuerpo que no es objeto o tipos incorrectos | 422 |
+| `CONFLICT` | 409 |
+| `NOT_FOUND`, ruta desconocida | 404 |
+| `UNAUTHENTICATED` (sin sesión, vencida o cuenta inactiva) | 401 |
+| `FORBIDDEN` (rol), `POST` desde un origen no permitido | 403 |
+| `POST` con cuerpo que no es `application/json` | 415 |
+| Cuerpo de más de 100 kB | 413 |
+| Cualquier otro | 500 con mensaje genérico; el detalle solo en el log |
+
+### Cookie de sesión
+
+- `dm_session`, `HttpOnly`, `SameSite=Lax`, `Path=/api`; `Secure` según `COOKIE_SECURE`. Su valor es el token; en la base solo está su SHA-256.
+- `Expires` = `session.expiresAt`. Cada petición autenticada reenvía la cookie con la expiración vigente, así que se renueva cuando negocio la desliza (30 min de inactividad, tope de 12 h).
+- Login y registro reciben la cookie anterior (`currentToken`) y negocio borra esa sesión antes de abrir otra. Logout borra la sesión y la cookie. Una sesión vencida o de una cuenta inactiva responde 401 y también borra la cookie.
+- **Mismo host para front y API:** `127.0.0.1` y `localhost` son sitios distintos y con `SameSite=Lax` la cookie no viaja entre ellos. Por eso el frontend usa `http://127.0.0.1:8080/api` y `CORS_ORIGIN=http://127.0.0.1:3000`.
+
+### CSRF
+
+El frontend no envía token CSRF. `originGuard` (`presentation/middleware/origin.middleware.ts`) acepta un método que modifica datos (todo lo que no es `GET`/`HEAD`/`OPTIONS`) solo si el `Origin` (o, si falta, el `Referer`) está en `CORS_ORIGIN`, y, si trae cuerpo, solo con `Content-Type: application/json`. Un formulario de otro sitio no puede enviar JSON sin preflight de CORS, y CORS solo responde con credenciales a `CORS_ORIGIN`. Junto con `SameSite=Lax` cubre el riesgo sin cambiar el frontend.
+
+### Variables de entorno
+
+`config/env.ts` las valida al arrancar y, si falta alguna o es inválida, el proceso termina listando todos los problemas.
+
+| Variable | Obligatoria | Uso |
+| --- | --- | --- |
+| `NODE_ENV` | sí | `development`, `test` o `production` |
+| `PORT` | sí | Puerto HTTP (8080) |
+| `CORS_ORIGIN` | sí | Origen del frontend, o varios separados por comas; CORS y CSRF usan la misma lista |
+| `DATABASE_URL` | sí | `mysql://…` (la misma de Prisma CLI) |
+| `COOKIE_SECURE` | no | `true`/`false`; vacía: `false` en `development`, `true` en el resto |
+
+### Composición
+
+`container.ts` arma un solo `PrismaClient`, `createPrismaUnitOfWork`, `createSystemClock`, `createScryptPasswordHasher` y un `AccountNotifier` que solo escribe en el log (todavía no hay proveedor de correo). `app.ts` recibe los casos de uso ya construidos, así los tests HTTP usan los fakes en memoria. `server.ts` carga `.env`, valida la configuración, arranca y cierra Prisma con `SIGINT`/`SIGTERM`.
+
 ## Arquitectura por capas
 
 Según `Arquitectura.md`: cada capa solo conoce a la inmediata inferior y las dependencias van siempre hacia abajo.
@@ -63,8 +130,9 @@ src/
     entities/ rules/ use-cases/ ports/
   db/            Prisma: cliente, unit of work y repositorios que implementan los ports
     repositories/ generated/ (cliente generado, no versionado)
-  config/        Configuración y variables de entorno
-  app.ts         Express (CORS, JSON, router)
+  config/        Configuración y variables de entorno (env.ts)
+  container.ts   Composición: conecta DB, negocio y presentación
+  app.ts         Express (CORS, CSRF, cookies, JSON, router, errores)
   server.ts      Arranque
 ```
 
@@ -72,9 +140,11 @@ ESLint (`eslint.config.mts`) hace cumplir las dependencias: negocio no importa p
 
 ## Estado
 
-- **Negocio (`src/business/`, issue #5): completo y probado con repositorios falsos.** Todavía no está conectado a HTTP ni a una base de datos.
-- **Presentación (issue #6):** solo existe `GET /api/health`.
-- **DB (issue #4):** esquema, migración, seed y repositorios con Prisma y MySQL, probados contra MySQL (`npm run test:integration`). Falta conectarlos en la composición (`createPrismaClient` + `createPrismaUnitOfWork`), junto con presentación.
+- **Negocio (`src/business/`, issue #5): completo y probado con repositorios falsos.**
+- **Presentación (`src/presentation/`, issue #6): completa.** Todos los endpoints del contrato del frontend, cookie de sesión, CSRF por origen y manejo de errores, probados con supertest.
+- **DB (issue #4):** esquema, migración, seed y repositorios con Prisma y MySQL, probados contra MySQL (`npm run test:integration`).
+- **Composición (`container.ts`):** las tres capas conectadas. Desbloquea el frontend en modo HTTP (`NEXT_PUBLIC_APP_ENV=staging`).
+- **Pendiente:** proveedor de correo para invitaciones y recuperación de contraseña (hoy solo se registran en el log).
 
 ## Lógica de negocio
 
@@ -118,3 +188,6 @@ Reglas principales:
 ### Tests
 
 `npm test` corre los tests de `tests/unit/` con vitest. Usan los ports falsos de `tests/support/in-memory.ts`, que aplican las restricciones únicas, serializan las transacciones y revierten si una falla. Así se prueban la atomicidad y los préstamos simultáneos sin base de datos.
+
+- `tests/unit/http-*.test.ts`: la app Express con supertest sobre esos fakes (auth y cookie, RBAC, errores, CSRF, préstamo y devolución, cuentas, dashboard). Validan las respuestas con una copia de los esquemas del frontend (`tests/support/frontend-contract.ts`); si el contrato cambia en `frontend/src/business/entities/models.ts`, hay que actualizarla.
+- `tests/integration/http.test.ts`: humo contra MySQL con la composición real (`createContainer`): login, listar equipos, prestar, devolver y logout.
