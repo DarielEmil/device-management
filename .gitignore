@@ -59,5 +59,7 @@ playwright-report/
 test-results/
 
 next-env.d.ts
+
+docs/*
 # Cliente generado por `prisma generate`
 backend/src/db/generated/

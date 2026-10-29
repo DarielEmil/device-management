@@ -19,7 +19,7 @@ const app = createApp({
 });
 
 const server = app.listen(config.port, () => {
-  console.log(`Backend escuchando en http://127.0.0.1:${config.port}/api`);
+  console.log(`Backend escuchando en http://devices.localhost:${config.port}/api`);
 });
 
 function shutdown() {

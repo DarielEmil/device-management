@@ -1,6 +1,6 @@
 # Device Management — Backend
 
-API REST del monolito. **Node.js 22, Express 5 y TypeScript estricto.** Convive con `../frontend` en el mismo repositorio y sirve en `http://127.0.0.1:8080/api`, la URL de `NEXT_PUBLIC_API_BASE_URL` en `frontend/.env.example` (ver "Cookie de sesión": front y API deben estar en el mismo host).
+API REST del monolito. **Node.js 22, Express 5 y TypeScript estricto.** Convive con `../frontend` en el mismo repositorio y sirve en `http://devices.localhost:8080/api`, la URL de `NEXT_PUBLIC_API_BASE_URL` en `frontend/.env.example` (ver "Cookie de sesión": front y API deben estar en el mismo host).
 
 ## Ejecutar en local
 
@@ -96,7 +96,7 @@ Rutas, cuerpos y errores siguen el contrato del frontend (`frontend/src/api/`), 
 - `dm_session`, `HttpOnly`, `SameSite=Lax`, `Path=/api`; `Secure` según `COOKIE_SECURE`. Su valor es el token; en la base solo está su SHA-256.
 - `Expires` = `session.expiresAt`. Cada petición autenticada reenvía la cookie con la expiración vigente, así que se renueva cuando negocio la desliza (30 min de inactividad, tope de 12 h).
 - Login y registro reciben la cookie anterior (`currentToken`) y negocio borra esa sesión antes de abrir otra. Logout borra la sesión y la cookie. Una sesión vencida o de una cuenta inactiva responde 401 y también borra la cookie.
-- **Mismo host para front y API:** `127.0.0.1` y `localhost` son sitios distintos y con `SameSite=Lax` la cookie no viaja entre ellos. Por eso el frontend usa `http://127.0.0.1:8080/api` y `CORS_ORIGIN=http://127.0.0.1:3000`.
+- **Mismo host para front y API:** el navegador compara los hosts como texto (`127.0.0.1` y `localhost` son sitios distintos) y con `SameSite=Lax` la cookie no viaja entre sitios. Por eso los dos usan `devices.localhost`: el frontend en `http://devices.localhost:3000` (`next dev --hostname devices.localhost`) con `NEXT_PUBLIC_API_BASE_URL=http://devices.localhost:8080/api`, y el backend con `CORS_ORIGIN=http://devices.localhost:3000`. Los navegadores y Node resuelven `*.localhost` a la propia máquina sin configuración.
 
 ### CSRF
 

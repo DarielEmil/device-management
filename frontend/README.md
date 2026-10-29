@@ -12,7 +12,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Abrir **http://127.0.0.1:3000**. `next dev` también selecciona mocks por defecto si no existe `.env.local`.
+Abrir **http://devices.localhost:3000** (los navegadores resuelven `*.local` a la propia máquina, sin tocar `/etc/hosts`). `next dev` también selecciona mocks por defecto si no existe `.env.local`.
 
 | Cuenta demo | Correo                     | Contraseña  |
 | ----------- | -------------------------- | ----------- |
@@ -115,7 +115,7 @@ Errores HTTP: `{ "message": "...", "fields": { "code": "..." } }` con status no 
 npm run check          # ESLint + TypeScript + tests unitarios
 npm run build          # Compilación de producción
 npx playwright install chromium
-npm run test:e2e       # Levanta su propio servidor mock en 127.0.0.1:3100
+npm run test:e2e       # Levanta su propio servidor mock en devices.localhost:3100
 ```
 
 Playwright verifica login, registro, inventario, duplicados, préstamos, devoluciones, empleados, invitaciones, desactivación, permisos y teclado. Capturas en `test-results/`, informe en `playwright-report/`.
