@@ -5,10 +5,11 @@ import {
   UserStatus,
   type Actor,
   type InvitationInput,
+  type LinkEmployeeInput,
   type PublicUser,
 } from "../entities/user.entity.js";
 import { authorize, Permission } from "../rules/permissions.rules.js";
-import { parseInvitation } from "../rules/validation.rules.js";
+import { parseInvitation, parseLinkEmployee } from "../rules/validation.rules.js";
 import type { UseCaseDeps } from "./deps.use-case.js";
 
 const EMAIL_TAKEN = "Ya existe una cuenta con este correo.";
@@ -61,6 +62,36 @@ export function createAccountUseCases({ uow, clock, notifier }: UseCaseDeps) {
       });
       await notifier.invitationCreated(invited);
       return invited;
+    },
+
+    // Solo vincula: no cambia el empleado ni el nombre de la cuenta.
+    async linkEmployee(
+      actor: Actor,
+      userId: string,
+      input: LinkEmployeeInput,
+    ): Promise<PublicUser> {
+      authorize(actor, Permission.AccountsWrite);
+      const { employeeId } = parseLinkEmployee(input);
+      return uow.transaction(async (repositories) => {
+        const user = await repositories.users.findById(userId);
+        if (!user) throw new DomainError("La cuenta no existe.", DomainErrorCode.NotFound);
+        if (user.status === UserStatus.Inactive)
+          throw new DomainError("La cuenta está inactiva.", DomainErrorCode.Conflict);
+        if (user.employeeId)
+          throw new DomainError("La cuenta ya tiene un empleado vinculado.", DomainErrorCode.Conflict);
+        // Bloqueo: un vínculo simultáneo al mismo empleado espera y ya ve esta cuenta.
+        const employee = await repositories.employees.findByIdForUpdate(employeeId);
+        if (!employee)
+          throw new DomainError("El empleado no existe.", DomainErrorCode.NotFound, {
+            employeeId: INVALID_EMPLOYEE,
+          });
+        if (!employee.active || (await repositories.users.findByEmployeeId(employee.id)))
+          throw new DomainError("El empleado no se puede vincular.", DomainErrorCode.Conflict, {
+            employeeId: INVALID_EMPLOYEE,
+          });
+        await repositories.users.linkEmployee(user.id, employee.id);
+        return toPublicUser({ ...user, employeeId: employee.id });
+      });
     },
 
     // Los préstamos activos se conservan; se devuelven después (CU-04).

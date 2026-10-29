@@ -299,6 +299,71 @@ test("registro público crea un empleado sin selector de rol", async ({
   ).toHaveCount(0);
 });
 
+test("el Encargado vincula una cuenta registrada y la cuenta ve sus préstamos", async ({
+  page,
+}) => {
+  // Sin recargar: los datos demo viven en memoria durante toda la prueba.
+  const signIn = async (email: string) => {
+    await page.getByLabel("Correo electrónico", { exact: false }).fill(email);
+    await page.getByLabel(/^Contraseña/).fill("Demo2026!");
+    await page.getByRole("button", { name: "Iniciar sesión", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible();
+  };
+  const signOut = async () => {
+    await page.getByRole("button", { name: "Cerrar sesión" }).click();
+    await expect(page).toHaveURL(/\/login$/);
+  };
+
+  await page.goto("/register");
+  await page.getByLabel("Nombre completo").fill("Pedro R.");
+  await page.getByLabel("Correo electrónico").fill("pedro.ramirez@empresa.com");
+  await page.getByLabel(/^Contraseña/).fill("Demo2026!");
+  await page.getByRole("button", { name: "Crear cuenta", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "No tienes equipos asignados" })).toBeVisible();
+  await signOut();
+
+  await signIn("laura.mendez@empresa.com");
+  await navigate(page, "Usuarios");
+  await page.getByRole("link", { name: "Empleados", exact: false }).click();
+  await page.getByRole("button", { name: "Registrar empleado", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Nombres").fill("Pedro");
+  await dialog.getByLabel("Apellidos").fill("Ramírez");
+  await dialog.getByLabel("Cédula").fill("001-2223334-5");
+  await dialog.getByLabel("Departamento").selectOption("Tecnología");
+  await dialog.getByRole("button", { name: "Registrar empleado", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+
+  await navigate(page, "Inventario");
+  await page.getByRole("button", { name: "Prestar EQ-006", exact: true }).click();
+  await dialog.getByRole("combobox", { name: "Empleado", exact: false }).click();
+  await page.getByRole("option", { name: "Pedro Ramírez", exact: false }).click();
+  await dialog.getByLabel("Fecha prevista de devolución").fill("2026-10-20");
+  await dialog.getByRole("button", { name: "Confirmar préstamo" }).click();
+  await expect(dialog).not.toBeVisible();
+
+  await navigate(page, "Usuarios");
+  await expect(
+    page.getByRole("row").filter({ hasText: "ana.garcia@empresa.com" }).getByRole("button", { name: "Vincular empleado" }),
+  ).toHaveCount(0);
+  const row = page.getByRole("row").filter({ hasText: "pedro.ramirez@empresa.com" });
+  await expect(row).toContainText("Sin empleado");
+  await row.getByRole("button", { name: "Vincular empleado" }).click();
+  await dialog.getByRole("combobox", { name: "Empleado", exact: false }).click();
+  await expect(page.getByRole("option", { name: "Ana García", exact: false })).toHaveCount(0);
+  await page.getByRole("option", { name: "Pedro Ramírez", exact: false }).click();
+  await dialog.getByRole("button", { name: "Vincular empleado", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByText("Cuenta vinculada a Pedro Ramírez.")).toBeVisible();
+  await expect(row).toContainText("Pedro Ramírez");
+  await expect(row.getByRole("button", { name: "Vincular empleado" })).toHaveCount(0);
+  await signOut();
+
+  await signIn("pedro.ramirez@empresa.com");
+  await navigate(page, "Mis préstamos");
+  await expect(page.getByRole("row").filter({ hasText: "EQ-006" })).toBeVisible();
+});
+
 test("recuperación informa que no se envía correo real en mocks", async ({
   page,
 }) => {

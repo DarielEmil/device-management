@@ -15,6 +15,7 @@ const PROTECTED = [
   ["get", "/api/accounts"],
   ["post", "/api/invitations"],
   ["post", "/api/accounts/x/deactivate"],
+  ["post", "/api/accounts/x/link-employee"],
   ["get", "/api/dashboard"],
 ] as const;
 
@@ -35,6 +36,7 @@ describe("HTTP: autenticación y RBAC", () => {
     ["get", "/api/accounts"],
     ["post", "/api/invitations"],
     ["post", "/api/accounts/x/deactivate"],
+    ["post", "/api/accounts/x/link-employee"],
   ] as const)("el Empleado en %s %s → 403", async (method, path) => {
     const { asEmployee } = setupHttp();
     const browser = await asEmployee();
@@ -259,6 +261,46 @@ describe("HTTP: cuentas e invitaciones", () => {
     const badRole = await manager.post("/api/invitations", { email: "x@empresa.com", role: "admin" });
     expect(badRole.status).toBe(422);
     expect(badRole.body.fields).toEqual({ role: "Selecciona un rol." });
+  });
+});
+
+describe("HTTP: vincular cuenta con empleado", () => {
+  it("valida, vincula y rechaza un segundo vínculo", async () => {
+    const { asManager, addEmployee, addUser, employeeUser } = setupHttp();
+    const manager = await asManager();
+    const marta = addEmployee({ firstName: "Marta", lastName: "López" });
+    const account = addUser({ name: "Marta", email: "marta@empresa.com" });
+    const field = { employeeId: "Selecciona un empleado activo sin cuenta vinculada." };
+
+    const empty = await manager.post(`/api/accounts/${account.id}/link-employee`, {});
+    expect(empty.status).toBe(422);
+    expect(empty.body.fields).toEqual({ employeeId: "El empleado es obligatorio." });
+    const badType = await manager.post(`/api/accounts/${account.id}/link-employee`, { employeeId: 7 });
+    expect(badType.status).toBe(422);
+    expect(badType.body.fields).toEqual({ employeeId: "Valor no válido." });
+
+    const noAccount = await manager.post("/api/accounts/no-existe/link-employee", { employeeId: marta.id });
+    expect(noAccount.status).toBe(404);
+    const noEmployee = await manager.post(`/api/accounts/${account.id}/link-employee`, { employeeId: "no-existe" });
+    expect(noEmployee.status).toBe(404);
+    expect(noEmployee.body.fields).toEqual(field);
+
+    const linked = await manager.post(`/api/accounts/${account.id}/link-employee`, { employeeId: marta.id });
+    expect(linked.status).toBe(200);
+    expect(expectContract(contract.account, linked.body).data).toMatchObject({
+      id: account.id,
+      name: "Marta",
+      employeeId: marta.id,
+    });
+
+    const again = await manager.post(`/api/accounts/${account.id}/link-employee`, { employeeId: marta.id });
+    expect(again.status).toBe(409);
+    expect(again.body.message).toBe("La cuenta ya tiene un empleado vinculado.");
+    const taken = await manager.post(`/api/accounts/${addUser().id}/link-employee`, { employeeId: marta.id });
+    expect(taken.status).toBe(409);
+    expect(taken.body.fields).toEqual(field);
+    const linkedAlready = await manager.post(`/api/accounts/${employeeUser.id}/link-employee`, { employeeId: marta.id });
+    expect(linkedAlready.status).toBe(409);
   });
 });
 

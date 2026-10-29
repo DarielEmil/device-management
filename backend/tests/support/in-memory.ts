@@ -191,6 +191,15 @@ export function createInMemoryUnitOfWork(): InMemoryUnitOfWork {
         const row = store.users.get(id);
         if (row) row.status = status;
       },
+      async linkEmployee(id, employeeId) {
+        write("users.linkEmployee");
+        if (values(store.users).some((row) => row.employeeId === employeeId))
+          throw conflict("employeeId");
+        const row = store.users.get(id);
+        if (!row || row.employeeId)
+          throw new DomainError("La cuenta ya tiene un empleado vinculado.", DomainErrorCode.Conflict);
+        row.employeeId = employeeId;
+      },
     },
     sessions: {
       async findById(id) {

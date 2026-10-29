@@ -17,6 +17,7 @@ import {
   Role,
   type CredentialsInput,
   type InvitationInput,
+  type LinkEmployeeInput,
   type RegistrationInput,
 } from "../entities/user.entity.js";
 import { isIsoDate } from "./dates.rules.js";
@@ -191,4 +192,11 @@ export function parseInvitation(input: InvitationInput): ValidInvitation {
       : null;
   fields.check();
   return { email, role, employeeId };
+}
+
+export function parseLinkEmployee(input: LinkEmployeeInput): LinkEmployeeInput {
+  const fields = new Fields();
+  const employeeId = fields.text("employeeId", input.employeeId, { label: "El empleado" });
+  fields.check();
+  return { employeeId };
 }

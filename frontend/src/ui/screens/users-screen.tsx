@@ -26,6 +26,7 @@ import {
   DeactivateModal,
   EmployeeModal,
   InviteModal,
+  LinkEmployeeModal,
 } from "../components/management-modals";
 import { usePagination } from "../hooks/use-pagination";
 import { initials, roleLabels, statusLabels } from "../format";
@@ -202,6 +203,13 @@ function AccountsTable() {
   const [role, setRole] = useState("");
   const [status, setStatus] = useState("");
   const [deactivating, setDeactivating] = useState<Account | null>(null);
+  const [linking, setLinking] = useState<Account | null>(null);
+  const employeeName = (account: Account) => {
+    const employee = snapshot.employees.find(
+      (item) => item.id === account.employeeId,
+    );
+    return employee ? fullName(employee) : null;
+  };
   const items = selectAccounts(snapshot, { query, role, status });
   const pagination = usePagination(items);
   return (
@@ -257,6 +265,7 @@ function AccountsTable() {
                 {[
                   "Usuario",
                   "Correo electrónico",
+                  "Empleado",
                   "Rol",
                   "Estado",
                   "Acciones",
@@ -282,6 +291,11 @@ function AccountsTable() {
                     </div>
                   </td>
                   <td className="text-muted">{account.email}</td>
+                  <td className={account.employeeId ? undefined : "text-muted"}>
+                    {account.employeeId
+                      ? (employeeName(account) ?? "—")
+                      : "Sin empleado"}
+                  </td>
                   <td>{roleLabels[account.role]}</td>
                   <td>
                     <StatusBadge
@@ -294,18 +308,18 @@ function AccountsTable() {
                     />
                   </td>
                   <td>
-                    {account.status !== AccountStatus.Inactive &&
-                    account.id !== session?.account.id ? (
-                      <Button
-                        variant="ghost"
-                        className="text-danger hover:bg-red-50"
-                        onClick={() => setDeactivating(account)}
-                      >
-                        Desactivar
-                      </Button>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
+                    <AccountActions
+                      canLink={
+                        account.status !== AccountStatus.Inactive &&
+                        !account.employeeId
+                      }
+                      canDeactivate={
+                        account.status !== AccountStatus.Inactive &&
+                        account.id !== session?.account.id
+                      }
+                      onLink={() => setLinking(account)}
+                      onDeactivate={() => setDeactivating(account)}
+                    />
                   </td>
                 </tr>
               ))}
@@ -339,6 +353,9 @@ function AccountsTable() {
           noun="cuentas"
         />
       </section>
+      {linking && (
+        <LinkEmployeeModal account={linking} onClose={() => setLinking(null)} />
+      )}
       {deactivating && (
         <DeactivateModal
           account={deactivating}
@@ -346,5 +363,33 @@ function AccountsTable() {
         />
       )}
     </>
+  );
+}
+
+function AccountActions(props: {
+  canLink: boolean;
+  canDeactivate: boolean;
+  onLink(): void;
+  onDeactivate(): void;
+}) {
+  if (!props.canLink && !props.canDeactivate)
+    return <span className="text-muted">—</span>;
+  return (
+    <div className="flex items-center gap-1">
+      {props.canLink && (
+        <Button variant="ghost" onClick={props.onLink}>
+          Vincular empleado
+        </Button>
+      )}
+      {props.canDeactivate && (
+        <Button
+          variant="ghost"
+          className="text-danger hover:bg-red-50"
+          onClick={props.onDeactivate}
+        >
+          Desactivar
+        </Button>
+      )}
+    </div>
   );
 }

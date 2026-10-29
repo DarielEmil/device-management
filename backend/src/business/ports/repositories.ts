@@ -52,6 +52,7 @@ export interface UserRepository {
   findByEmployeeId(employeeId: string): Promise<User | null>;
   insert(user: NewRecord<User>): Promise<User>;
   updateStatus(id: string, status: UserStatus): Promise<void>;
+  linkEmployee(id: string, employeeId: string): Promise<void>;
 }
 
 export interface SessionRepository {

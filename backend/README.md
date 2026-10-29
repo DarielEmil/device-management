@@ -1,6 +1,6 @@
 # Device Management — Backend
 
-API REST del monolito. **Node.js 22, Express 5 y TypeScript estricto.** Convive con `../frontend` en el mismo repositorio y sirve en `http://127.0.0.1:8080/api`, la URL de `NEXT_PUBLIC_API_BASE_URL` en `frontend/.env.example` (ver "Cookie de sesión": front y API deben estar en el mismo host).
+API REST del monolito. **Node.js 22, Express 5 y TypeScript estricto.** Convive con `../frontend` en el mismo repositorio y sirve en `http://devices.localhost:8080/api`, la URL de `NEXT_PUBLIC_API_BASE_URL` en `frontend/.env.example` (ver "Cookie de sesión": front y API deben estar en el mismo host).
 
 ## Ejecutar en local
 
@@ -73,6 +73,7 @@ Rutas, cuerpos y errores siguen el contrato del frontend (`frontend/src/api/`), 
 | `POST /api/loans/:id/return` | CU-04 `returnLoan` | Encargado | `200 { data: Loan }` |
 | `GET /api/accounts` | `accounts.listAccounts` | Encargado | `200 { data: Account[] }` |
 | `POST /api/invitations` | `accounts.inviteAccount` | Encargado | `201 { data: Account }` |
+| `POST /api/accounts/:id/link-employee` | `accounts.linkEmployee` | Encargado | `200 { data: Account }`; cuerpo `{ employeeId }` |
 | `POST /api/accounts/:id/deactivate` | `accounts.deactivateAccount` | Encargado | `200 { data: Account }` |
 | `GET /api/dashboard` | `dashboard.getDashboard` | ambos | `200 { data: Dashboard }` |
 
@@ -96,7 +97,7 @@ Rutas, cuerpos y errores siguen el contrato del frontend (`frontend/src/api/`), 
 - `dm_session`, `HttpOnly`, `SameSite=Lax`, `Path=/api`; `Secure` según `COOKIE_SECURE`. Su valor es el token; en la base solo está su SHA-256.
 - `Expires` = `session.expiresAt`. Cada petición autenticada reenvía la cookie con la expiración vigente, así que se renueva cuando negocio la desliza (30 min de inactividad, tope de 12 h).
 - Login y registro reciben la cookie anterior (`currentToken`) y negocio borra esa sesión antes de abrir otra. Logout borra la sesión y la cookie. Una sesión vencida o de una cuenta inactiva responde 401 y también borra la cookie.
-- **Mismo host para front y API:** `127.0.0.1` y `localhost` son sitios distintos y con `SameSite=Lax` la cookie no viaja entre ellos. Por eso el frontend usa `http://127.0.0.1:8080/api` y `CORS_ORIGIN=http://127.0.0.1:3000`.
+- **Mismo host para front y API:** el navegador compara los hosts como texto (`127.0.0.1` y `localhost` son sitios distintos) y con `SameSite=Lax` la cookie no viaja entre sitios. Por eso los dos usan `devices.localhost`: el frontend en `http://devices.localhost:3000` (`next dev --hostname devices.localhost`) con `NEXT_PUBLIC_API_BASE_URL=http://devices.localhost:8080/api`, y el backend con `CORS_ORIGIN=http://devices.localhost:3000`. Los navegadores y Node resuelven `*.localhost` a la propia máquina sin configuración.
 
 ### CSRF
 
@@ -156,7 +157,7 @@ ESLint (`eslint.config.mts`) hace cumplir las dependencias: negocio no importa p
 | `employees` | `registerEmployee` (CU-02), `listEmployees` | Encargado |
 | `loans` | `createLoan` (CU-03), `returnLoan` (CU-04), `listLoans` (CU-06) | Registrar y devolver: Encargado. Consultar: ambos; el Empleado solo ve los suyos |
 | `auth` | `register`, `login`, `logout`, `getCurrentSession`, `requestPasswordRecovery` | Público |
-| `accounts` | `listAccounts`, `inviteAccount`, `deactivateAccount` | Encargado |
+| `accounts` | `listAccounts`, `inviteAccount`, `linkEmployee`, `deactivateAccount` | Encargado |
 | `dashboard` | `getDashboard` | Ambos; el Empleado sin indicadores del inventario |
 
 Reglas principales:
@@ -173,6 +174,7 @@ Reglas principales:
   - Contraseñas con scrypt (parámetros de OWASP). Mismo error y mismo costo para correo inexistente, contraseña incorrecta o cuenta no activa.
 - **Cuentas:**
   - Invitar crea una cuenta `Invitado` sin contraseña.
+  - Vincular empleado (`linkEmployee`): el Encargado asocia una cuenta existente sin empleado (`Invitado` o `Activo`, de cualquier rol) a un empleado activo sin cuenta. Solo vincula: no desvincula ni cambia el empleado, y el nombre de la cuenta no cambia. Es una transacción que bloquea la fila del empleado (`findByIdForUpdate`); el índice `ux_users_employee` y el `update` condicional (`employee_id IS NULL`) cubren las carreras. Errores: cuenta inexistente `NOT_FOUND`; `employeeId` vacío `VALIDATION`; cuenta `Inactivo` o ya vinculada `CONFLICT` sin campo; empleado inexistente `NOT_FOUND` y empleado inactivo o con otra cuenta `CONFLICT`, ambos con `employeeId: "Selecciona un empleado activo sin cuenta vinculada."`.
   - Desactivar es una baja lógica: la cuenta pasa a `Inactivo`, su empleado se desactiva y sus sesiones se cierran. Sus préstamos activos se conservan (se devuelven con CU-04) y ya no puede recibir préstamos nuevos. No se puede desactivar la propia cuenta.
 
 ### Decisiones abiertas del issue #5 y valor tomado
@@ -180,7 +182,7 @@ Reglas principales:
 | Decisión | Valor actual | Dónde cambiarlo |
 | --- | --- | --- |
 | Duración de la sesión | 30 min de inactividad, tope de 12 h | `DEFAULT_SESSION_POLICY` o `sessionPolicy` en `createUseCases` |
-| ¿Todo empleado tiene cuenta? | No. Una cuenta puede no tener empleado y viceversa | — |
+| ¿Todo empleado tiene cuenta? | No. Una cuenta puede no tener empleado y viceversa; el Encargado vincula una cuenta existente a un empleado activo sin cuenta | `accounts.linkEmployee` |
 | ¿El Empleado solo ve sus préstamos? | Sí, como el frontend | `loanScope` en `use-cases/loans.ts` |
 | ¿Estado "Vencido"? | No. Se usa `Atrasado`, derivado, como el frontend | `rules/loans.ts` |
 | Recuperación de contraseña | Solo avisa por `AccountNotifier`. Falta definir el proveedor de correo y dónde guardar el token de recuperación | — |
@@ -190,4 +192,4 @@ Reglas principales:
 `npm test` corre los tests de `tests/unit/` con vitest. Usan los ports falsos de `tests/support/in-memory.ts`, que aplican las restricciones únicas, serializan las transacciones y revierten si una falla. Así se prueban la atomicidad y los préstamos simultáneos sin base de datos.
 
 - `tests/unit/http-*.test.ts`: la app Express con supertest sobre esos fakes (auth y cookie, RBAC, errores, CSRF, préstamo y devolución, cuentas, dashboard). Validan las respuestas con una copia de los esquemas del frontend (`tests/support/frontend-contract.ts`); si el contrato cambia en `frontend/src/business/entities/models.ts`, hay que actualizarla.
-- `tests/integration/http.test.ts`: humo contra MySQL con la composición real (`createContainer`): login, listar equipos, prestar, devolver y logout.
+- `tests/integration/http.test.ts`: humo contra MySQL con la composición real (`createContainer`): login, listar equipos, prestar, devolver y logout; y vincular una cuenta a un empleado (un segundo vínculo al mismo empleado responde 409).

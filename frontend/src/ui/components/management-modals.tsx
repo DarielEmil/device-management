@@ -15,6 +15,7 @@ import {
   employeeInputSchema,
   equipmentInputSchema,
   inviteInputSchema,
+  linkEmployeeInputSchema,
   loanInputSchema,
   type EmployeeInput,
   type EquipmentInput,
@@ -394,6 +395,80 @@ export function InviteModal({ onClose }: { onClose(): void }) {
         <ModalFooter
           onCancel={onClose}
           label={mockMode ? "Crear invitación" : "Enviar invitación"}
+          busy={form.busy}
+          disabled={!form.valid}
+        />
+      </form>
+    </Modal>
+  );
+}
+
+export function LinkEmployeeModal({
+  account,
+  onClose,
+}: {
+  account: Account;
+  onClose(): void;
+}) {
+  const { application, snapshot, refresh, notify } = useApplication();
+  const form = useFormModel(
+    linkEmployeeInputSchema,
+    { employeeId: "" },
+    async (input) => {
+      const linked = await application.linkEmployee(account.id, input.employeeId);
+      const employee = snapshot.employees.find(
+        (item) => item.id === linked.employeeId,
+      );
+      await refresh();
+      notify(
+        employee
+          ? `Cuenta vinculada a ${fullName(employee)}.`
+          : "Cuenta vinculada correctamente.",
+      );
+      onClose();
+    },
+  );
+  const options = snapshot.employees.filter(
+    (employee) =>
+      employee.active &&
+      !snapshot.accounts.some((item) => item.employeeId === employee.id),
+  );
+  return (
+    <Modal
+      title="Vincular empleado"
+      description="La cuenta verá los préstamos del empleado seleccionado."
+      onClose={onClose}
+      busy={form.busy}
+    >
+      <form onSubmit={form.onSubmit} noValidate className="space-y-5">
+        <div className="rounded-lg border border-border bg-panel p-4">
+          <p className="font-medium">{account.name}</p>
+          <p className="mt-1 text-[13px] text-muted">{account.email}</p>
+          <div className="mt-3">
+            <Badge tone="neutral">{roleLabels[account.role]}</Badge>
+          </div>
+        </div>
+        <SearchableSelect
+          label="Empleado"
+          placeholder="Buscar empleado sin cuenta…"
+          required
+          options={options.map((employee) => ({
+            value: employee.id,
+            label: fullName(employee),
+            detail: employee.identity,
+          }))}
+          value={form.values.employeeId}
+          onChange={(value) => form.set("employeeId", value)}
+          error={form.errors.employeeId}
+        />
+        <p className="text-xs text-muted">
+          Solo aparecen empleados activos sin cuenta. El vínculo no se puede
+          cambiar después.
+        </p>
+        <InlineError>{form.errors.form}</InlineError>
+        <ModalFooter
+          onCancel={onClose}
+          label="Vincular empleado"
           busy={form.busy}
           disabled={!form.valid}
         />

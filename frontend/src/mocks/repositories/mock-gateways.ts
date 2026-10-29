@@ -258,6 +258,43 @@ export function createMockGateways(options: MockOptions = {}): Gateways {
         data.accounts.push(account);
         return clone(account);
       },
+      // Mismas reglas, códigos y mensajes que POST /accounts/:id/link-employee.
+      async linkEmployee(accountId, employeeId) {
+        await wait();
+        manager();
+        if (!employeeId.trim())
+          throw new DomainError("Revisa los campos indicados.", {
+            employeeId: "El empleado es obligatorio.",
+          });
+        const account = data.accounts.find((item) => item.id === accountId);
+        if (!account)
+          throw new DomainError("La cuenta no existe.", {}, "NOT_FOUND");
+        if (account.status === AccountStatus.Inactive)
+          throw new DomainError("La cuenta está inactiva.", {}, "CONFLICT");
+        if (account.employeeId)
+          throw new DomainError(
+            "La cuenta ya tiene un empleado vinculado.",
+            {},
+            "CONFLICT",
+          );
+        const field = {
+          employeeId: "Selecciona un empleado activo sin cuenta vinculada.",
+        };
+        const employee = data.employees.find((item) => item.id === employeeId);
+        if (!employee)
+          throw new DomainError("El empleado no existe.", field, "NOT_FOUND");
+        if (
+          !employee.active ||
+          data.accounts.some((item) => item.employeeId === employee.id)
+        )
+          throw new DomainError(
+            "El empleado no se puede vincular.",
+            field,
+            "CONFLICT",
+          );
+        account.employeeId = employee.id;
+        return clone(account);
+      },
       async deactivate(accountId) {
         await wait();
         manager();

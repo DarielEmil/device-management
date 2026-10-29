@@ -9,7 +9,7 @@ export default defineConfig({
   workers: process.env.CI ? 2 : undefined,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://127.0.0.1:3100",
+    baseURL: "http://devices.localhost:3100",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
@@ -24,7 +24,7 @@ export default defineConfig({
   ],
   webServer: {
     command: "npm run dev -- --port 3100",
-    url: "http://127.0.0.1:3100/login",
+    url: "http://devices.localhost:3100/login",
     reuseExistingServer: false,
     timeout: 120_000,
     env: {

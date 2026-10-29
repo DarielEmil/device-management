@@ -37,6 +37,7 @@ export interface LoanGateway {
 export interface AccountGateway {
   list(): Promise<Account[]>;
   invite(input: InviteInput): Promise<Account>;
+  linkEmployee(id: string, employeeId: string): Promise<Account>;
   deactivate(id: string): Promise<Account>;
 }
 export interface Gateways {

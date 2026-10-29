@@ -56,6 +56,10 @@ export const inviteInputSchema = z.object({
   employeeId: z.string(),
 });
 
+export const linkEmployeeInputSchema = z.object({
+  employeeId: required("El empleado"),
+});
+
 export type EquipmentInput = z.infer<typeof equipmentInputSchema>;
 export type EmployeeInput = z.infer<typeof employeeInputSchema>;
 export type LoanInput = z.infer<typeof loanInputSchema>;
