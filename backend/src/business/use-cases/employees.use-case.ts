@@ -7,7 +7,7 @@ import { DomainError, DomainErrorCode } from "../entities/errors.entity.js";
 import type { Actor } from "../entities/user.entity.js";
 import { authorize, Permission } from "../rules/permissions.rules.js";
 import { parseEmployeeInput } from "../rules/validation.rules.js";
-import { newId, type UseCaseDeps } from "./deps.use-case.js";
+import type { UseCaseDeps } from "./deps.use-case.js";
 
 export function createEmployeeUseCases({ uow, clock }: UseCaseDeps) {
   return {
@@ -23,14 +23,11 @@ export function createEmployeeUseCases({ uow, clock }: UseCaseDeps) {
         throw new DomainError("Ya existe un empleado con esta cédula.", DomainErrorCode.Conflict, {
           identity: `Ya existe un empleado con esta cédula (${fullName(existing)}).`,
         });
-      const created: Employee = {
-        id: newId(clock),
+      return employees.insert({
         ...data,
         active: true,
         createdAt: clock.now(),
-      };
-      await employees.insert(created);
-      return created;
+      });
     },
 
     async listEmployees(actor: Actor): Promise<Employee[]> {

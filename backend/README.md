@@ -12,21 +12,44 @@ npm run check    # lint + typecheck + tests
 npm run build && npm start
 ```
 
-### Base de datos (MySQL 8.4.13 con Docker)
+### Base de datos (MySQL 8.4.13 + Prisma 7)
 
 `docker-compose.yml` levanta MySQL y usa el mismo `.env` que el backend. Desde `backend/`:
 
 ```sh
-cp .env.example .env          # cambiar MYSQL_ROOT_PASSWORD y MYSQL_PASSWORD
-docker compose up -d          # crea el volumen, inicializa la base y arranca
-docker compose ps             # esperar a que el estado sea "healthy"
-docker compose exec mysql mysql -udevice_management -p device_management
+cp .env.example .env          # cambiar contraseñas; DATABASE_URL debe coincidir con MYSQL_*
+docker compose up -d          # esperar a "healthy" con: docker compose ps
+npm run prisma:migrate        # aplica las migraciones (prisma migrate dev)
+npm run prisma:seed           # datos demo del frontend; contraseña Demo2026!
+npm run test:integration      # tests contra MySQL, en la base <MYSQL_DATABASE>_test
 ```
 
-- La primera vez que se crea el volumen, MySQL crea la base `MYSQL_DATABASE` y el usuario `MYSQL_USER` con acceso a ella. Además ejecuta los scripts de `database/init/`, que dan permiso al usuario para la shadow database de `prisma migrate dev`. Las tablas las crean las migraciones, no el contenedor.
-- El puerto del host es `3306` por defecto, configurable con `MYSQL_PORT`.
-- `DATABASE_URL` debe usar el mismo usuario, contraseña, puerto y base que las variables `MYSQL_*` del mismo `.env`.
-- `docker compose down` detiene el contenedor y conserva los datos. `docker compose down -v` también borra el volumen: el siguiente `up` vuelve a inicializar todo.
+| Script | Qué hace |
+| --- | --- |
+| `prisma:generate` | Genera el cliente en `src/db/generated/` (también corre en `postinstall`; no se versiona) |
+| `prisma:migrate` | `prisma migrate dev`: aplica migraciones y crea nuevas a partir de `prisma/schema.prisma` |
+| `prisma:deploy` | `prisma migrate deploy`: solo aplica las pendientes (CI y producción) |
+| `prisma:seed` | Siembra una base vacía (`prisma/seed.ts`); si ya hay usuarios no hace nada |
+| `prisma:reset` | Borra la base, reaplica las migraciones y siembra |
+| `prisma:studio` | Explorador web de los datos |
+
+- La primera vez que se crea el volumen, MySQL crea la base y el usuario, y ejecuta `database/init/01-grants.sh`: crea `<MYSQL_DATABASE>_test` y da permisos sobre ella y sobre las shadow databases de `prisma migrate dev`. Si el volumen ya existía sin ese script, `docker compose down -v` y volver a levantar.
+- `docker compose down` conserva los datos; `down -v` borra el volumen.
+
+#### Decisiones del esquema
+
+- **Nombres** en inglés y snake_case (`@@map`/`@map`). Los valores de estado y rol se guardan en español (`Disponible`, `Prestado`, `Activo`, `Devuelto`, `Encargado`, `Empleado`, `Inactivo`, `Invitado`); los repositorios los traducen a las claves en inglés de negocio (`db/mappers.ts`).
+- **PK:** UUID v7 generado por Prisma Client al insertar (`@default(uuid(7))`), guardado como `CHAR(36)`. Los `insert` de los repositorios reciben el registro sin `id` (`NewRecord<T>`) y devuelven el creado; negocio no genera ids. Se eligió sobre `BINARY(16)` porque se lee en consultas y logs sin conversiones y Prisma lo maneja como `String`; el costo es más espacio por índice. `sessions.id` es el SHA-256 en hex del token (`VARCHAR(64)`).
+- **Fechas:** `DATETIME(3)` en lugar de `TIMESTAMP` (que se desborda en 2038); `DATE` para las fechas de préstamo.
+- **Diferencias con el ER v0.4**, porque negocio las necesita:
+  - `users` tiene `name` y `status` (`Activo`/`Inactivo`/`Invitado`) en lugar de `is_active`, y `password_hash` admite NULL mientras la cuenta está `Invitado`.
+  - `loans` tiene `created_at` para ordenar la actividad reciente.
+  - `employees.department` es NOT NULL (negocio siempre lo exige).
+- **Un solo préstamo activo por equipo:** MySQL no tiene índices únicos parciales, así que la migración crea la columna generada `active_device_id` (= `device_id` mientras el préstamo está `Activo`, si no NULL) con el índice único `ux_loans_device_active`. Está declarada en `schema.prisma` solo para que Prisma no la borre; nunca se escribe. Además, negocio bloquea la fila del equipo (`SELECT … FOR UPDATE`) dentro de la transacción.
+- **CHECK** (SQL manual en la migración inicial, Prisma no los modela): catálogos de estados y roles, `expected_return_date >= loan_date`, `actual_return_date >= loan_date` y `status = 'Devuelto'` ⇔ `actual_return_date IS NOT NULL`.
+- **Borrado:** las FK de `loans` y `users` son `RESTRICT` (baja lógica); solo `sessions → users` es `CASCADE`.
+- **Transacciones:** `createPrismaUnitOfWork` usa `prisma.$transaction` con `READ COMMITTED`, para que después de un `FOR UPDATE` las lecturas vean lo último confirmado.
+- **Errores:** una violación de índice único se traduce a `DomainError CONFLICT` con el mismo campo y mensaje que usa negocio (`db/errors.ts`).
 
 ## Arquitectura por capas
 
@@ -38,20 +61,20 @@ src/
     routes/ controllers/ dto/ middleware/
   business/      Entidades, reglas, casos de uso y ports (contratos). Sin HTTP ni SQL
     entities/ rules/ use-cases/ ports/
-  db/            Adaptadores que implementan los ports (repositorios)
-    repositories/
+  db/            Prisma: cliente, unit of work y repositorios que implementan los ports
+    repositories/ generated/ (cliente generado, no versionado)
   config/        Configuración y variables de entorno
   app.ts         Express (CORS, JSON, router)
   server.ts      Arranque
 ```
 
-ESLint (`eslint.config.mts`) hace cumplir las dependencias: negocio no importa presentación, DB ni Express; presentación no importa DB; DB no importa HTTP ni casos de uso.
+ESLint (`eslint.config.mts`) hace cumplir las dependencias: negocio no importa presentación, DB, Express ni Prisma; presentación no importa DB ni Prisma; DB no importa HTTP ni casos de uso.
 
 ## Estado
 
 - **Negocio (`src/business/`, issue #5): completo y probado con repositorios falsos.** Todavía no está conectado a HTTP ni a una base de datos.
 - **Presentación (issue #6):** solo existe `GET /api/health`.
-- **DB (issue #4):** pendiente. Debe implementar los ports de `business/ports/` con Prisma y MySQL.
+- **DB (issue #4):** esquema, migración, seed y repositorios con Prisma y MySQL, probados contra MySQL (`npm run test:integration`). Falta conectarlos en la composición (`createPrismaClient` + `createPrismaUnitOfWork`), junto con presentación.
 
 ## Lógica de negocio
 
@@ -69,7 +92,7 @@ ESLint (`eslint.config.mts`) hace cumplir las dependencias: negocio no importa p
 Reglas principales:
 
 - **Errores:** `DomainError` con código `VALIDATION`, `CONFLICT`, `NOT_FOUND`, `UNAUTHENTICATED` o `FORBIDDEN`. El mensaje y `fields` están en español, con las mismas claves y textos que usa el frontend.
-- **Identificadores:** UUID v7 generados en negocio.
+- **Identificadores:** UUID v7 generados por Prisma al insertar (ver "Decisiones del esquema"). Los fakes en memoria usan `randomUUID()`.
 - **Equipos:** el código se guarda en mayúsculas. El tipo se normaliza al catálogo del frontend (`Laptop`, `Monitor`, `Periférico`, `Tablet`) sin distinguir mayúsculas ni tildes; un tipo fuera del catálogo es un error de validación.
 - **Préstamos:**
   - Estados guardados: `Activo` → `Devuelto`. `Por vencer` (0 a 3 días) y `Atrasado` se calculan con la fecha de hoy en `America/Santo_Domingo`.

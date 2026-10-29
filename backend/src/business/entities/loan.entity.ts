@@ -23,6 +23,9 @@ export interface Loan {
   dueOn: IsoDate;
   returnedOn: IsoDate | null;
   status: LoanStatus;
+  // Encargado que registró el préstamo (CU-03) y, al devolverlo, la devolución (CU-04).
+  registeredById: string;
+  returnedById: string | null;
   createdAt: Date;
 }
 
