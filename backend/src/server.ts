@@ -1,8 +1,31 @@
+import "dotenv/config";
 import { createApp } from "./app.js";
+import { loadConfig, type AppConfig } from "./config/env.js";
+import { createContainer } from "./container.js";
 
-const port = Number(process.env.PORT ?? 8080);
-const corsOrigin = process.env.CORS_ORIGIN ?? "http://127.0.0.1:3000";
+let config: AppConfig;
+try {
+  config = loadConfig();
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+}
 
-createApp(corsOrigin).listen(port, () => {
-  console.log(`Backend escuchando en http://localhost:${port}/api`);
+const container = createContainer(config);
+const app = createApp({
+  useCases: container.useCases,
+  corsOrigins: config.corsOrigins,
+  cookieSecure: config.cookieSecure,
 });
+
+const server = app.listen(config.port, () => {
+  console.log(`Backend escuchando en http://127.0.0.1:${config.port}/api`);
+});
+
+function shutdown() {
+  server.close(() => {
+    void container.close().finally(() => process.exit(0));
+  });
+}
+process.once("SIGINT", shutdown);
+process.once("SIGTERM", shutdown);
